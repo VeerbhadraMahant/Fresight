@@ -1,0 +1,34 @@
+# FreightSight — full stack in one command:
+#   docker compose up --build
+# then open http://localhost:8080  (API docs: http://localhost:8000/docs)
+
+services:
+  backend:
+    build: ./backend
+    image: freightsight-api
+    environment:
+      FREIGHTSIGHT_LOG_LEVEL: INFO
+      FREIGHTSIGHT_SKIP_LIVE_PROBE: "1"   # set to 0 to enable the public BDI probe
+      FREIGHTSIGHT_CORS_ORIGINS: "*"
+    ports:
+      - "8000:8000"                        # optional — for direct API / Swagger access
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request,sys; sys.exit(0 if urllib.request.urlopen('http://127.0.0.1:8000/api/health').status==200 else 1)"]
+      interval: 30s
+      timeout: 5s
+      start_period: 25s
+      retries: 3
+    restart: unless-stopped
+
+  frontend:
+    build:
+      context: ./frontend
+      args:
+        VITE_API_BASE: ""                  # same-origin /api, proxied by nginx
+    image: freightsight-web
+    depends_on:
+      backend:
+        condition: service_healthy
+    ports:
+      - "8080:80"
+    restart: unless-stopped

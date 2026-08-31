@@ -18,7 +18,7 @@ port constraints, time the market, and get early warnings — so the desk can mo
 | **(a) Optimal market-entry timing** | `backend/app/timing.py` | `WAIT` vs `FIX_NOW` with a concrete entry window and expected saving; **spot vs 1/3/6/12-month period charter** with expected cost *and* cost-variance, risk-adjusted; explicit comparison against the current reactive rolling-spot approach (expected saving + risk reduction). |
 | **(c) Idle-scenario management** | `backend/app/idle_risk.py` (`idle_outlook`) | Idle-risk index (0–100) from demand seasonality + congestion + monsoon exposure, estimated idle days over 12 weeks, soft-demand week list, and mitigation options — including **alternative East Coast discharge ports** with lower waiting time. |
 | **(d) Risk mitigation / early warnings** | `backend/app/idle_risk.py` (`scan_risks`) | Severity-ranked alert feed: volatility spikes, port-congestion build-ups, bunker surges, seasonal demand troughs, rate extremes — each with a recommended action. |
-| **Dashboard** | `frontend/` | Single-screen desk: scenario form → KPI row, forecast chart with band, vessel table, timing panel, idle panel, risk feed. Dark maritime theme. |
+| **Dashboard** | `frontend/` | Single-screen desk: scenario form → KPI stat cards, forecast chart with band, vessel table, timing panel, idle panel, risk feed. Light editorial "data observatory" theme. |
 | **One-shot "run the desk"** | `POST /api/scenario` | Enter cargo + ports + duration → the whole analysis in one response (powers the dashboard). |
 
 ---
@@ -26,23 +26,26 @@ port constraints, time the market, and get early warnings — so the desk can mo
 ## Architecture
 
 ```
-backend/  FastAPI + pandas/statsmodels/scikit-learn
+backend/  FastAPI + pandas + statsmodels
   app/
     reference_data.py   ports, vessel classes, trade routes, commodities, seasonality
                         (calibrated to public port-authority data & 2024–25 route rates)
     voyage_economics.py  bottom-up voyage estimate: hire + bunkers + port dues ÷ intake
     synthetic.py         stochastic market engine (freight, bunker, TCE, congestion, macro)
-    market_store.py      startup: probe public indices (best-effort) → build dataset
+    market_store.py      startup: best-effort BDI probe → build dataset (fully offline-capable)
     forecasting.py       HW + seasonal-naive ensemble, rolling-origin backtest, memoised
     vessel_optimizer.py  constraints rules engine → ranked recommendation
     timing.py            entry window + spot/period, risk-adjusted, vs reactive
     idle_risk.py         idle outlook + market-wide alert scan
     routers/             /api/reference/*  and  /api/{forecast,vessel,timing,risk,idle,scenario}
-  tests/test_smoke.py    10 end-to-end API tests
+  tests/test_smoke.py    14 end-to-end API tests
+  Dockerfile · pytest.ini · requirements.txt · requirements-dev.txt · .env.example
 
-frontend/  Vite + React + TypeScript + Tailwind + Recharts
-  src/components/  ScenarioForm, Kpi, ForecastChart, VesselTable, TimingPanel, IdlePanel, RiskFeed
-  src/App.tsx      layout + data flow
+frontend/  Vite + React + TypeScript + Tailwind + Recharts  ("Ventriloc" editorial theme)
+  src/components/  TopBar, ScenarioPanel, StatStrip, ForecastPanel/ForecastChart,
+                   VesselPanel, TimingPanel, IdlePanel, RiskFeed, ErrorBoundary
+  src/App.tsx      layout + data flow      src/lib/  theme + formatters
+  Dockerfile · nginx.conf · .env.example
 ```
 
 ---
@@ -81,19 +84,32 @@ unchanged.
 
 ## Running it
 
-### Backend (Python 3.11+)
+### Option A — Docker (one command)
+
+```bash
+docker compose up --build
+# dashboard  → http://localhost:8080
+# API + docs → http://localhost:8000/docs
+```
+
+`frontend` (nginx) serves the built SPA and proxies `/api` to the `backend` container. The
+backend runs fully offline in the container (`FREIGHTSIGHT_SKIP_LIVE_PROBE=1`).
+
+### Option B — local dev
+
+**Backend** (Python 3.11+, tested on 3.13):
 
 ```bash
 cd backend
 python -m venv .venv
-.venv\Scripts\activate            # Windows  (source .venv/bin/activate on macOS/Linux)
+.venv\Scripts\Activate.ps1        # Windows PowerShell  (source .venv/bin/activate elsewhere)
 pip install -r requirements.txt
-uvicorn app.main:app --port 8000  # first request builds the dataset (~3 s)
+uvicorn app.main:app --port 8000  # startup builds the dataset (~3 s)
 ```
 
-API docs at <http://127.0.0.1:8000/docs>. Tests: `pytest -q`.
+API docs at <http://127.0.0.1:8000/docs>. Tests: `pip install -r requirements-dev.txt && pytest`.
 
-### Frontend (Node 18+)
+**Frontend** (Node 18+, tested on 22):
 
 ```bash
 cd frontend
@@ -101,7 +117,19 @@ npm install
 npm run dev                       # http://localhost:5173  (proxies /api → :8000)
 ```
 
-Start the backend first, then the frontend.
+Start the backend first. No internet required — the live Baltic Dry Index fetch is best-effort
+only and can be disabled with `FREIGHTSIGHT_SKIP_LIVE_PROBE=1`.
+
+### Configuration
+
+| Variable | Where | Default | Purpose |
+|---|---|---|---|
+| `FREIGHTSIGHT_CORS_ORIGINS` | backend | `*` | comma-separated allowed origins |
+| `FREIGHTSIGHT_LOG_LEVEL` | backend | `INFO` | log verbosity |
+| `FREIGHTSIGHT_SKIP_LIVE_PROBE` | backend | `0` (`1` in Docker) | skip the outbound BDI probe |
+| `VITE_API_BASE` | frontend (build) | `""` (same-origin `/api`) | absolute API URL if cross-origin |
+
+See `backend/.env.example` and `frontend/.env.example`.
 
 ---
 

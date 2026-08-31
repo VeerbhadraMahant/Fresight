@@ -43,7 +43,7 @@ class MarketData:
     tce: pd.DataFrame          # index=date, columns=vessel -> USD/day
     congestion: pd.DataFrame   # index=date, columns=port_code -> waiting days
     drivers: pd.DataFrame      # index=date, columns=[commodity_index, global_ip, sentiment]
-    generated_at: pd.Timestamp = field(default_factory=lambda: pd.Timestamp.utcnow())
+    generated_at: pd.Timestamp = field(default_factory=lambda: pd.Timestamp.now(tz="UTC"))
     source: str = "synthetic-engine-v1"
 
     # ---- convenience accessors ------------------------------------------- #
@@ -250,5 +250,5 @@ def generate(seed: int = SEED) -> MarketData:
 
     return MarketData(
         freight=freight, bunker=vlsfo, tce=tce, congestion=congestion, drivers=drivers,
-        generated_at=pd.Timestamp.utcnow(),
+        generated_at=pd.Timestamp.now(tz="UTC"),
     )

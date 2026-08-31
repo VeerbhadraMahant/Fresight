@@ -17,19 +17,31 @@ back-test residual distribution, widened with the square root of the horizon.
 from __future__ import annotations
 
 import warnings
+from contextlib import contextmanager
 
 import numpy as np
 import pandas as pd
 
 from .synthetic import MarketData
 
-warnings.filterwarnings("ignore")
-
 try:
     from statsmodels.tsa.holtwinters import ExponentialSmoothing
+    from statsmodels.tools.sm_exceptions import ConvergenceWarning, ValueWarning
     _HAS_SM = True
 except Exception:  # pragma: no cover
     _HAS_SM = False
+    ConvergenceWarning = ValueWarning = Warning
+
+
+@contextmanager
+def _quiet_solver():
+    """Silence the noisy-but-expected optimiser warnings from a single fit,
+    without suppressing warnings process-wide."""
+    with warnings.catch_warnings():
+        warnings.simplefilter("ignore", ConvergenceWarning)
+        warnings.simplefilter("ignore", ValueWarning)
+        warnings.simplefilter("ignore", RuntimeWarning)
+        yield
 
 WEEK = "W-MON"
 SEASON_WEEKS = 52
@@ -43,13 +55,14 @@ def _weekly(y: pd.Series) -> pd.Series:
 
 def _fit_holt_winters(train: pd.Series, steps: int) -> np.ndarray:
     if _HAS_SM and len(train) >= 2 * SEASON_WEEKS + 4:
-        model = ExponentialSmoothing(
-            train, trend="add", damped_trend=True,
-            seasonal="add", seasonal_periods=SEASON_WEEKS,
-            initialization_method="estimated",
-        )
-        fit = model.fit(optimized=True)
-        return np.asarray(fit.forecast(steps), dtype=float)
+        with _quiet_solver():
+            model = ExponentialSmoothing(
+                train, trend="add", damped_trend=True,
+                seasonal="add", seasonal_periods=SEASON_WEEKS,
+                initialization_method="estimated",
+            )
+            fit = model.fit(optimized=True)
+            return np.asarray(fit.forecast(steps), dtype=float)
     # fallback: damped linear trend on last 26 weeks
     tail = train.iloc[-26:]
     x = np.arange(len(tail))

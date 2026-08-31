@@ -1,35 +1,50 @@
 """FreightSight API -- Freight Forecasting & Vessel Chartering Decision Support.
 
-SIH 2026 prototype backend.  Run with:  uvicorn app.main:app --reload
+SIH 2026 prototype backend.
+
+Local:  uvicorn app.main:app --reload
+Prod:   uvicorn app.main:app --host 0.0.0.0 --port 8000
+
+Environment variables (all optional):
+  FREIGHTSIGHT_CORS_ORIGINS   comma-separated allowed origins (default: "*")
+  FREIGHTSIGHT_LOG_LEVEL      DEBUG | INFO | WARNING | ERROR   (default: INFO)
+  FREIGHTSIGHT_SKIP_LIVE_PROBE  "1" to skip the public Baltic Dry Index probe
 """
 
 from __future__ import annotations
 
 import logging
+import os
 from contextlib import asynccontextmanager
 
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
+from . import __version__
 from .market_store import STORE
 from .routers import analysis, reference
 
-logging.basicConfig(level=logging.INFO,
-                    format="%(asctime)s %(levelname)s %(name)s: %(message)s")
+logging.basicConfig(
+    level=os.getenv("FREIGHTSIGHT_LOG_LEVEL", "INFO").upper(),
+    format="%(asctime)s %(levelname)s %(name)s: %(message)s",
+)
 log = logging.getLogger("freightsight")
+
+_CORS_ORIGINS = os.getenv("FREIGHTSIGHT_CORS_ORIGINS", "*")
+_ALLOW = ["*"] if _CORS_ORIGINS.strip() == "*" else [o.strip() for o in _CORS_ORIGINS.split(",") if o.strip()]
 
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     log.info("building market dataset (public-source probe + synthetic engine)...")
     STORE.build()
-    log.info("ready.")
+    log.info("ready - %d series, mode=%s", STORE.data.freight.shape[1], STORE.provenance.mode)
     yield
 
 
 app = FastAPI(
     title="FreightSight API",
-    version="0.1.0",
+    version=__version__,
     description=(
         "Predictive freight-rate forecasting, vessel-type optimisation against "
         "port constraints, market-entry timing, and idle/risk management for bulk "
@@ -40,7 +55,8 @@ app = FastAPI(
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
+    allow_origins=_ALLOW,
+    allow_credentials=_ALLOW != ["*"],
     allow_methods=["*"],
     allow_headers=["*"],
 )
@@ -54,6 +70,7 @@ def health():
     data_ready = STORE.data is not None
     return {
         "status": "ok" if data_ready else "starting",
+        "version": __version__,
         "dataset_mode": STORE.provenance.mode if data_ready else None,
         "series": STORE.data.freight.shape[1] if data_ready else 0,
     }
@@ -61,4 +78,4 @@ def health():
 
 @app.get("/", tags=["meta"])
 def root():
-    return {"name": "FreightSight API", "docs": "/docs", "health": "/api/health"}
+    return {"name": "FreightSight API", "version": __version__, "docs": "/docs", "health": "/api/health"}

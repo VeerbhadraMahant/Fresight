@@ -113,8 +113,10 @@ body {
   /* buttons — sharp 0px, Graphite fill. Ember is NEVER a button fill. */
   .btn {
     @apply inline-flex items-center justify-center gap-2 rounded-none font-display text-[15px] tracking-[-0.02em]
-      transition-colors duration-150;
+      transition-colors duration-150
+      focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ember;
     padding: 10px 20px;
+    min-height: 44px;
   }
   .btn-primary {
     @apply btn bg-graphite text-canvas hover:bg-black
@@ -131,7 +133,8 @@ body {
   .field {
     @apply w-full rounded-none border border-mist bg-canvas px-3 py-2.5 font-sans text-[15px] text-graphite
       outline-none transition-colors duration-150
-      focus:border-graphite;
+      focus:border-graphite focus-visible:outline focus-visible:outline-1 focus-visible:outline-offset-1 focus-visible:outline-ember;
+    min-height: 44px;
   }
   select.field {
     @apply cursor-pointer appearance-none bg-[length:14px] bg-[right_12px_center] bg-no-repeat pr-9;
@@ -159,7 +162,8 @@ body {
 
   /* editorial link — Ember underline */
   .link {
-    @apply text-graphite underline decoration-ember decoration-2 underline-offset-4 hover:decoration-graphite;
+    @apply text-graphite underline decoration-ember decoration-2 underline-offset-4 hover:decoration-graphite
+      focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ember;
   }
 
   /* data table */

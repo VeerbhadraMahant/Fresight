@@ -96,3 +96,44 @@ def test_full_scenario(client):
     assert j["forecast"]["backtest"]["ensemble"]["mape"] is not None
     assert j["timing"]["charter_structure"]["recommendation"] in ("SPOT", "PERIOD")
     assert j["idle_outlook"]["idle_risk_index"] >= 0
+
+
+def test_scenario_synthesized_route_degrades_gracefully(client):
+    """A lane with no traded series still returns a vessel recommendation;
+    forecast / timing / idle come back null rather than erroring."""
+    r = client.post("/api/scenario", json={
+        "origin": "USBAL", "destination": "INHAL", "commodity": "Coking Coal",
+        "cargo_volume_t": 150_000, "contract_duration_months": 3,
+        "forecast_horizon_days": 90})
+    assert r.status_code == 200
+    j = r.json()
+    assert j["resolved"]["has_market_series"] is False
+    assert j["vessel_optimisation"]["recommendation"]["vessel"]  # still ranked
+    assert j["forecast"] is None and j["timing"] is None
+    assert isinstance(j["risk_alerts"]["scoped"], list)
+
+
+def test_every_discharge_port_resolves_a_scenario(client):
+    ports = client.get("/api/reference/ports").json()["discharge_ports"]
+    for p in ports:
+        r = client.post("/api/scenario", json={
+            "origin": "IDMBR", "destination": p["code"],
+            "commodity": "Thermal Coal", "cargo_volume_t": 90_000,
+            "contract_duration_months": 3, "forecast_horizon_days": 60})
+        assert r.status_code == 200, p["code"]
+        assert r.json()["vessel_optimisation"]["options"], p["code"]
+
+
+def test_bad_port_code_is_rejected(client):
+    r = client.post("/api/scenario", json={
+        "origin": "NOPE", "destination": "INPRT", "commodity": "Thermal Coal",
+        "cargo_volume_t": 100_000, "contract_duration_months": 3,
+        "forecast_horizon_days": 90})
+    assert r.status_code == 400
+
+
+def test_forecast_intervals_widen_with_horizon(client):
+    j = client.get("/api/forecast", params={
+        "route_id": "IDMBR-INVTZ", "vessel": "Supramax", "horizon_days": 120}).json()
+    spans = [row["hi"] - row["lo"] for row in j["forecast"]]
+    assert spans[-1] >= spans[0]  # uncertainty grows further out

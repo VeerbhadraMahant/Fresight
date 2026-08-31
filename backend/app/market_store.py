@@ -1,18 +1,21 @@
 """Market data provider.
 
-Tries to enrich the model with *public* live reference points (Baltic Dry Index,
-VLSFO) on startup; if the network is unavailable or the pages change shape, it
-falls back cleanly to the fully-offline synthetic engine. Either way the app
-serves a complete, self-consistent dataset.
+On startup, makes a best-effort fetch of *public* Baltic Dry Index values and
+records them as a sanity reference (shown in the dashboard header). If the
+network is unavailable or a page changes shape, it falls back cleanly and runs
+fully offline. Either way the app serves a complete, self-consistent dataset.
 
-The live points are only used to nudge the synthetic anchor so the "latest"
-end of the history lines up with the real market on demo day -- the historical
-shape, backtests and forecasts are all driven by the synthetic engine.
+The live points are reference-only -- the historical series, back-tests and
+forecasts are entirely driven by the offline voyage-economics + stochastic
+engine (`synthetic.py`), calibrated to published 2024-25 route rates.
+
+Set FREIGHTSIGHT_SKIP_LIVE_PROBE=1 to disable the outbound request entirely.
 """
 
 from __future__ import annotations
 
 import logging
+import os
 import re
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
@@ -22,6 +25,11 @@ import httpx
 from .synthetic import MarketData, generate
 
 log = logging.getLogger("freightsight.market")
+
+# Skip the outbound probe entirely (e.g. locked-down deploy) with
+# FREIGHTSIGHT_SKIP_LIVE_PROBE=1. The app is fully functional without it.
+_SKIP_PROBE = os.getenv("FREIGHTSIGHT_SKIP_LIVE_PROBE", "").strip() in {"1", "true", "yes"}
+_PROBE_TIMEOUT = float(os.getenv("FREIGHTSIGHT_PROBE_TIMEOUT", "4.0"))
 
 _PUBLIC_SOURCES = [
     # (label, url, regex capturing a numeric value, plausible (lo, hi) range)
@@ -41,7 +49,7 @@ class Provenance:
     note: str = ""
 
 
-def _try_public_sources(timeout: float = 6.0) -> list[dict]:
+def _try_public_sources(timeout: float = _PROBE_TIMEOUT) -> list[dict]:
     found: list[dict] = []
     headers = {"User-Agent": "Mozilla/5.0 (FreightSight prototype; +https://sih)"}
     for label, url, pattern, (lo, hi) in _PUBLIC_SOURCES:
@@ -70,11 +78,14 @@ class MarketStore:
 
     def build(self) -> None:
         live = []
-        attempted = [label for label, *_ in _PUBLIC_SOURCES]
-        try:
-            live = _try_public_sources()
-        except Exception as exc:  # noqa: BLE001
-            log.warning("public source probe crashed: %s", exc)
+        attempted = [] if _SKIP_PROBE else [label for label, *_ in _PUBLIC_SOURCES]
+        if _SKIP_PROBE:
+            log.info("live-source probe disabled (FREIGHTSIGHT_SKIP_LIVE_PROBE)")
+        else:
+            try:
+                live = _try_public_sources()
+            except Exception as exc:  # noqa: BLE001
+                log.warning("public source probe crashed: %s", exc)
 
         self.data = generate()
         self.provenance = Provenance(
