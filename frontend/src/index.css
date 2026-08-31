@@ -1,0 +1,221 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* ─────────────────────────────────────────────────────────────
+   Ventriloc — editorial data observatory. Light mode only.
+   Depth from surface contrast + whitespace, never shadow.
+   ───────────────────────────────────────────────────────────── */
+
+:root {
+  color-scheme: light;
+}
+
+* {
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
+}
+
+html,
+body,
+#root {
+  min-height: 100%;
+}
+
+body {
+  margin: 0;
+  background: #ffffff;
+  color: #202020;
+  font-family: Inter, system-ui, sans-serif;
+  font-size: 16px;
+  line-height: 1.5;
+}
+
+::selection {
+  background: #ff682c;
+  color: #ffffff;
+}
+
+@layer base {
+  h1,
+  h2,
+  h3,
+  h4 {
+    font-family: "Space Grotesk", "Inter Tight", system-ui, sans-serif;
+    font-weight: 400;
+    letter-spacing: -0.02em;
+    color: #202020;
+    margin: 0;
+  }
+}
+
+@layer components {
+  /* layout shell */
+  .shell {
+    @apply mx-auto w-full max-w-shell px-6 md:px-10;
+  }
+
+  /* alternating section bands — separation without dividers */
+  .band-canvas {
+    @apply bg-canvas;
+  }
+  .band-ash {
+    @apply bg-ash;
+  }
+
+  /* cards — flat, no shadow, depth from surface contrast */
+  .card {
+    @apply rounded-card border border-mist bg-canvas p-6 md:p-10;
+  }
+  .card-tight {
+    @apply rounded-card border border-mist bg-canvas p-6;
+  }
+  /* signature asymmetric card — soft top-left, sharp elsewhere */
+  .card-signature {
+    @apply border border-mist bg-canvas p-6 md:p-10;
+    border-radius: 6px 0 0 0;
+  }
+  .card-plain {
+    @apply rounded-card bg-canvas p-6;
+  }
+
+  /* typography roles */
+  .display {
+    @apply font-display text-heading-lg md:text-display;
+  }
+  .h-section {
+    @apply font-display text-heading;
+  }
+  .h-card {
+    @apply font-display text-subheading text-graphite;
+  }
+  .eyebrow {
+    @apply font-display text-[13px] uppercase tracking-[0.12em] text-slate;
+  }
+  .caption {
+    @apply text-[14px] leading-[1.43] text-steel;
+  }
+  .meta {
+    @apply font-sans text-[13px] text-slate;
+  }
+  .lede {
+    @apply text-[18px] leading-[1.5] text-steel;
+  }
+
+  /* number display — tabular for data */
+  .figure {
+    @apply font-display tabular-nums tracking-[-0.02em];
+  }
+  .num {
+    @apply tabular-nums;
+  }
+
+  /* buttons — sharp 0px, Graphite fill. Ember is NEVER a button fill. */
+  .btn {
+    @apply inline-flex items-center justify-center gap-2 rounded-none font-display text-[15px] tracking-[-0.02em]
+      transition-colors duration-150;
+    padding: 10px 20px;
+  }
+  .btn-primary {
+    @apply btn bg-graphite text-canvas hover:bg-black
+      disabled:cursor-not-allowed disabled:opacity-40;
+  }
+  .btn-ghost {
+    @apply btn border border-graphite bg-transparent text-graphite hover:bg-ash;
+  }
+
+  /* form controls — 0px radius, 1px Mist border */
+  .field-label {
+    @apply mb-1.5 block font-display text-[13px] tracking-[-0.02em] text-steel;
+  }
+  .field {
+    @apply w-full rounded-none border border-mist bg-canvas px-3 py-2.5 font-sans text-[15px] text-graphite
+      outline-none transition-colors duration-150
+      focus:border-graphite;
+  }
+  select.field {
+    @apply cursor-pointer appearance-none bg-[length:14px] bg-[right_12px_center] bg-no-repeat pr-9;
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='14' height='14' viewBox='0 0 24 24' fill='none' stroke='%23202020' stroke-width='1.5'%3E%3Cpath d='M6 9l6 6 6-6'/%3E%3C/svg%3E");
+  }
+
+  /* tags — 20px pill, achromatic */
+  .tag {
+    @apply inline-flex items-center gap-1.5 rounded-tag border border-mist bg-fog px-2.5 py-0.5
+      font-sans text-[12px] font-medium text-steel;
+  }
+  .tag-strong {
+    @apply tag border-graphite bg-canvas text-graphite;
+  }
+  .tag-warm {
+    @apply inline-flex items-center gap-1.5 rounded-tag px-2.5 py-0.5 font-sans text-[12px] font-medium text-graphite;
+    background: #ebe6dd;
+    border: 1px solid #e2dccf;
+  }
+
+  /* nav pill container — fully rounded */
+  .nav-pill {
+    @apply inline-flex items-center gap-4 rounded-pill bg-ash px-4.5 py-2 font-display text-[14px] tracking-[-0.02em] text-graphite;
+  }
+
+  /* editorial link — Ember underline */
+  .link {
+    @apply text-graphite underline decoration-ember decoration-2 underline-offset-4 hover:decoration-graphite;
+  }
+
+  /* data table */
+  .obs-table {
+    @apply w-full border-collapse font-sans text-[13px];
+  }
+  .obs-table thead th {
+    @apply border-b border-graphite px-3 py-2.5 text-left font-display text-[12px] font-normal uppercase tracking-[0.08em] text-slate;
+  }
+  .obs-table tbody td {
+    @apply border-b border-mist px-3 py-3 text-graphite;
+  }
+  .obs-table tbody tr:last-child td {
+    @apply border-b-0;
+  }
+
+  /* severity accent — chromatic-free; Ember/Brass as small accents only */
+  .sev-high {
+    border-left: 2px solid #ff682c;
+  }
+  .sev-medium {
+    border-left: 2px solid #816729;
+  }
+  .sev-low {
+    border-left: 2px solid #e8e8e8;
+  }
+}
+
+/* recharts — flat, thin, editorial */
+.recharts-cartesian-grid line {
+  stroke: #e8e8e8;
+}
+.recharts-cartesian-axis-line,
+.recharts-cartesian-axis-tick-line {
+  stroke: #e8e8e8;
+}
+.recharts-text {
+  fill: #828282;
+  font-family: Inter, sans-serif;
+  font-size: 12px;
+}
+.recharts-default-tooltip {
+  border: 1px solid #202020 !important;
+  border-radius: 0 !important;
+  padding: 10px 12px !important;
+  font-family: Inter, monospace !important;
+  font-size: 12px !important;
+}
+.recharts-tooltip-label {
+  font-family: "Space Grotesk", sans-serif !important;
+  letter-spacing: -0.02em;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  * {
+    animation-duration: 0.001ms !important;
+    transition-duration: 0.001ms !important;
+  }
+}
