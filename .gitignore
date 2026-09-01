@@ -10,6 +10,11 @@ frontend/node_modules/
 frontend/dist/
 *.local
 
+# Local env (keep .env.example)
+.env
+.env.*
+!.env.example
+
 # Editor / OS
 .vscode/
 .idea/

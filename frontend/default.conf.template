@@ -1,10 +1,10 @@
 # Rendered at container start by nginx's envsubst (see Dockerfile).
-# ${API_UPSTREAM} = host:port of the backend service.
-#   docker-compose : backend:8000        (default)
-#   Render         : freightsight-api:8000
+#   ${PORT}         port nginx listens on (default 80; PaaS platforms inject it)
+#   ${API_UPSTREAM} host:port of the backend service
+#                     docker-compose : backend:8000   (default)
 
 server {
-    listen 80;
+    listen ${PORT};
     server_name _;
     root /usr/share/nginx/html;
     index index.html;

@@ -1,36 +1,41 @@
-# Render.com blueprint — one public URL for the dashboard.
-# In the Render dashboard: New > Blueprint > pick this repo.
+# Render.com blueprint.  In the Render dashboard:  New > Blueprint > pick this repo.
 #
-#   freightsight-web  (public)  -> serves the SPA, proxies /api to ...
-#   freightsight-api  (private) -> the FastAPI backend
+#   freightsight-api  Docker web service (FastAPI)
+#   freightsight-web  static site (the built SPA), calling the API cross-origin
 #
-# No CORS, no VITE_API_BASE: the browser only ever talks to freightsight-web.
+# Service URLs on Render are deterministic (https://<name>.onrender.com), so the
+# API base and the CORS allow-list are wired below with no manual step.
 
 services:
   - type: web
     name: freightsight-api
     runtime: docker
-    repo: https://github.com/VeerbhadraMahant/SIH-2026
-    dockerfilePath: ./backend/Dockerfile
-    dockerContext: ./backend
     plan: free
+    rootDir: backend
+    dockerfilePath: ./Dockerfile
     healthCheckPath: /api/health
     envVars:
       - key: FREIGHTSIGHT_SKIP_LIVE_PROBE
         value: "1"
       - key: FREIGHTSIGHT_LOG_LEVEL
         value: INFO
+      - key: FREIGHTSIGHT_CORS_ORIGINS
+        value: https://freightsight-web.onrender.com
 
   - type: web
     name: freightsight-web
-    runtime: docker
-    repo: https://github.com/VeerbhadraMahant/SIH-2026
-    dockerfilePath: ./frontend/Dockerfile
-    dockerContext: ./frontend
-    plan: free
+    runtime: static
+    rootDir: frontend
+    buildCommand: npm ci --include=dev && npm run build
+    staticPublishPath: ./dist
     envVars:
-      - key: API_UPSTREAM
-        fromService:
-          type: web
-          name: freightsight-api
-          property: hostport
+      - key: VITE_API_BASE
+        value: https://freightsight-api.onrender.com
+    routes:
+      - type: rewrite
+        source: /*
+        destination: /index.html
+    headers:
+      - path: /assets/*
+        name: Cache-Control
+        value: public, max-age=31536000, immutable

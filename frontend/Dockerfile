@@ -14,11 +14,13 @@ ENV VITE_API_BASE=$VITE_API_BASE
 RUN npm run build
 
 FROM nginx:1.27-alpine AS serve
-# nginx renders templates through envsubst on startup
-ENV API_UPSTREAM=backend:8000
+# nginx renders templates through envsubst on startup; restrict it to our vars
+ENV PORT=80 \
+    API_UPSTREAM=backend:8000 \
+    NGINX_ENVSUBST_FILTER="^(PORT|API_UPSTREAM)$"
 COPY default.conf.template /etc/nginx/templates/default.conf.template
 COPY --from=build /app/dist /usr/share/nginx/html
 
 EXPOSE 80
 HEALTHCHECK --interval=30s --timeout=5s --retries=3 \
-    CMD wget -qO- http://127.0.0.1/ >/dev/null 2>&1 || exit 1
+    CMD wget -qO- "http://127.0.0.1:${PORT:-80}/" >/dev/null 2>&1 || exit 1
