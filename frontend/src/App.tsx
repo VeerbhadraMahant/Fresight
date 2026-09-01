@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
+import { Download } from "lucide-react";
 import { api } from "./api";
 import type {
   MarketSnapshot,
@@ -9,6 +10,7 @@ import type {
   ScenarioResponse,
   VesselRef,
 } from "./types";
+import { DEMO } from "./fixtures/demo";
 import { TopBar, type View } from "./components/TopBar";
 import { ScenarioPanel } from "./components/ScenarioPanel";
 import { StatStrip, type Stat } from "./components/StatStrip";
@@ -20,70 +22,96 @@ import { IdlePanel } from "./components/IdlePanel";
 import { RiskFeed } from "./components/RiskFeed";
 import { PlanView } from "./components/PlanView";
 import { BacktestView } from "./components/BacktestView";
+import { ApiErrorCard } from "./components/ApiErrorCard";
+import { exportScenarioPdf } from "./lib/exportPdf";
 import { pct, usdCompact } from "./lib/format";
 
-const DEFAULT_SCENARIO: ScenarioRequest = {
-  origin: "AUHPT",
-  destination: "INPRT",
-  commodity: "Thermal Coal",
-  cargo_volume_t: 600000,
-  contract_duration_months: 6,
-  laycan_month: 11,
-  vessel: null,
-  forecast_horizon_days: 120,
+const DEFAULT_SCENARIO = DEMO.scenarioRequest as unknown as ScenarioRequest;
+
+// pre-computed sample so the dashboard is never empty on load
+const _ports = DEMO.ports as unknown as { load_ports: PortRef[]; discharge_ports: PortRef[] };
+const SAMPLE = {
+  loadPorts: _ports.load_ports,
+  dischargePorts: _ports.discharge_ports,
+  vessels: DEMO.vessels as unknown as VesselRef[],
+  routes: DEMO.routes as unknown as RouteRef[],
+  provenance: DEMO.provenance as unknown as Provenance,
+  snapshot: DEMO.snapshot as unknown as MarketSnapshot,
+  result: DEMO.scenario as unknown as ScenarioResponse,
 };
 
 export default function App() {
   const [view, setView] = useState<View>("scenario");
-  const [loadPorts, setLoadPorts] = useState<PortRef[]>([]);
-  const [dischargePorts, setDischargePorts] = useState<PortRef[]>([]);
-  const [vessels, setVessels] = useState<VesselRef[]>([]);
-  const [routes, setRoutes] = useState<RouteRef[]>([]);
-  const [provenance, setProvenance] = useState<Provenance | null>(null);
-  const [snapshot, setSnapshot] = useState<MarketSnapshot | null>(null);
+  const [loadPorts, setLoadPorts] = useState<PortRef[]>(SAMPLE.loadPorts);
+  const [dischargePorts, setDischargePorts] = useState<PortRef[]>(SAMPLE.dischargePorts);
+  const [vessels, setVessels] = useState<VesselRef[]>(SAMPLE.vessels);
+  const [routes, setRoutes] = useState<RouteRef[]>(SAMPLE.routes);
+  const [provenance, setProvenance] = useState<Provenance | null>(SAMPLE.provenance);
+  const [snapshot, setSnapshot] = useState<MarketSnapshot | null>(SAMPLE.snapshot);
 
   const [scenario, setScenario] = useState<ScenarioRequest>(DEFAULT_SCENARIO);
-  const [result, setResult] = useState<ScenarioResponse | null>(null);
+  const [result, setResult] = useState<ScenarioResponse | null>(SAMPLE.result);
+  const [dataMode, setDataMode] = useState<"sample" | "live">("sample");
   const [loading, setLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-  const [booting, setBooting] = useState(true);
+  const [runError, setRunError] = useState<string | null>(null);
+  const [pdfBusy, setPdfBusy] = useState(false);
+  const [pdfError, setPdfError] = useState<string | null>(null);
+
+  const loadLive = useCallback(async () => {
+    setLoading(true);
+    setRunError(null);
+    try {
+      const [p, v, r, prov, snap] = await Promise.all([
+        api.ports(),
+        api.vessels(),
+        api.routes(),
+        api.provenance(),
+        api.snapshot(),
+      ]);
+      setLoadPorts(p.load_ports);
+      setDischargePorts(p.discharge_ports);
+      setVessels(v);
+      setRoutes(r);
+      setProvenance(prov);
+      setSnapshot(snap);
+      setResult(await api.scenario(DEFAULT_SCENARIO));
+      setDataMode("live");
+    } catch (e) {
+      setRunError(e instanceof Error ? e.message : String(e));
+    } finally {
+      setLoading(false);
+    }
+  }, []);
 
   const run = useCallback(async (req: ScenarioRequest) => {
     setLoading(true);
-    setError(null);
+    setRunError(null);
     try {
       setResult(await api.scenario(req));
+      setDataMode("live");
     } catch (e) {
-      setError(e instanceof Error ? e.message : String(e));
+      setRunError(e instanceof Error ? e.message : String(e));
     } finally {
       setLoading(false);
     }
   }, []);
 
   useEffect(() => {
-    (async () => {
-      try {
-        const [p, v, r, prov, snap] = await Promise.all([
-          api.ports(),
-          api.vessels(),
-          api.routes(),
-          api.provenance(),
-          api.snapshot(),
-        ]);
-        setLoadPorts(p.load_ports);
-        setDischargePorts(p.discharge_ports);
-        setVessels(v);
-        setRoutes(r);
-        setProvenance(prov);
-        setSnapshot(snap);
-        await run(DEFAULT_SCENARIO);
-      } catch (e) {
-        setError(e instanceof Error ? e.message : String(e));
-      } finally {
-        setBooting(false);
-      }
-    })();
-  }, [run]);
+    void loadLive();
+  }, [loadLive]);
+
+  const downloadPdf = useCallback(async () => {
+    if (!result) return;
+    setPdfBusy(true);
+    setPdfError(null);
+    try {
+      await exportScenarioPdf(result);
+    } catch (e) {
+      setPdfError(e instanceof Error ? e.message : "PDF export failed");
+    } finally {
+      setPdfBusy(false);
+    }
+  }, [result]);
 
   const stats = useMemo<Stat[] | null>(() => {
     if (!result) return null;
@@ -139,6 +167,22 @@ export default function App() {
     <div className="min-h-dvh bg-canvas">
       <TopBar snapshot={snapshot} provenance={provenance} view={view} onView={setView} />
 
+      {dataMode === "sample" && (
+        <div className="border-b border-mist" style={{ background: "#ebe6dd" }}>
+          <div className="shell flex flex-wrap items-center justify-between gap-2 py-2.5 font-sans text-[13px] text-graphite">
+            <span>
+              Showing a pre-computed sample scenario{loading ? " — loading live data…" : "."} The live
+              API may be waking up (free tier); it refreshes automatically.
+            </span>
+            {!loading && (
+              <button type="button" className="link" onClick={() => void loadLive()}>
+                Retry now
+              </button>
+            )}
+          </div>
+        </div>
+      )}
+
       <section className="band-canvas">
         <div className="shell py-12 md:py-14">
           <span className="eyebrow">FreightSight</span>
@@ -154,25 +198,27 @@ export default function App() {
               </p>
 
               <div className="mt-10">
-                {booting ? (
-                  <div className="card">
-                    <p className="caption">Building the market dataset — real feeds + voyage-economics engine…</p>
-                  </div>
-                ) : (
-                  <ScenarioPanel
-                    loadPorts={loadPorts}
-                    dischargePorts={dischargePorts}
-                    vessels={vessels}
-                    value={scenario}
-                    onChange={setScenario}
-                    onSubmit={() => run(scenario)}
-                    loading={loading}
-                  />
-                )}
-                {error && (
-                  <div className="mt-5 border border-graphite bg-canvas p-5">
-                    <span className="font-display tracking-[-0.02em] text-graphite">Request failed.</span>{" "}
-                    <span className="caption">{error}</span>
+                <ScenarioPanel
+                  loadPorts={loadPorts}
+                  dischargePorts={dischargePorts}
+                  vessels={vessels}
+                  value={scenario}
+                  onChange={setScenario}
+                  onSubmit={() => run(scenario)}
+                  loading={loading}
+                />
+                {runError && (
+                  <div className="mt-5">
+                    <ApiErrorCard
+                      title="Live request failed"
+                      message={runError}
+                      note={
+                        result
+                          ? "The results below are the last successful run (or the pre-computed sample). Retry when the API is reachable."
+                          : undefined
+                      }
+                      onRetry={() => run(scenario)}
+                    />
                   </div>
                 )}
               </div>
@@ -187,7 +233,7 @@ export default function App() {
                 from many single spot fixtures to fewer medium-term multiple-voyage contracts.
               </p>
               <div className="mt-10">
-                {!booting && <PlanView loadPorts={loadPorts} dischargePorts={dischargePorts} />}
+                <PlanView loadPorts={loadPorts} dischargePorts={dischargePorts} />
               </div>
             </>
           )}
@@ -200,7 +246,7 @@ export default function App() {
                 would each have cost over the last two years.
               </p>
               <div className="mt-10">
-                {!booting && <BacktestView routes={routes} vessels={vessels} />}
+                <BacktestView routes={routes} vessels={vessels} />
               </div>
             </>
           )}
@@ -211,12 +257,24 @@ export default function App() {
         <>
           <section className="band-ash">
             <div className="shell py-14">
-              <div className="mb-6 flex items-baseline justify-between">
+              <div className="mb-6 flex flex-wrap items-baseline justify-between gap-3">
                 <span className="eyebrow">headline</span>
-                <span className="meta">
-                  {result.resolved.lane} · {result.resolved.vessel}
-                </span>
+                <div className="flex items-center gap-4">
+                  <span className="meta">
+                    {result.resolved.lane} · {result.resolved.vessel}
+                  </span>
+                  <button
+                    type="button"
+                    className="btn-ghost !py-1.5"
+                    onClick={() => void downloadPdf()}
+                    disabled={pdfBusy}
+                  >
+                    <Download size={14} strokeWidth={1.5} />
+                    {pdfBusy ? "Preparing…" : "PDF"}
+                  </button>
+                </div>
               </div>
+              {pdfError && <p className="meta mb-3 text-graphite">PDF export failed: {pdfError}</p>}
               <StatStrip stats={stats} />
             </div>
           </section>
