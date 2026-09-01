@@ -18,7 +18,6 @@ import pandas as pd
 
 from .forecasting import forecast
 from .synthetic import MarketData
-from . import reference_data as ref
 
 WEEKS_PER_MONTH = 4.345
 

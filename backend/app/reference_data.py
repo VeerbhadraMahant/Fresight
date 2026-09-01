@@ -8,7 +8,7 @@ found, a conservative industry-typical value is used and flagged `assumed`.
 
 from __future__ import annotations
 
-from dataclasses import dataclass, field, asdict
+from dataclasses import asdict, dataclass
 from typing import Literal
 
 Region = Literal["Australia", "USA", "Mozambique", "Indonesia", "Russia", "India-EastCoast"]
@@ -212,13 +212,13 @@ def _add_route(r: Route) -> None:
     ROUTES[r.id] = r
 
 
-_add_route(Route("AUHPT-INPRT", "AUHPT", "INPRT", 6300, "none", "Hay Point -> Paradip", 0.90, "monsoon", 1.4))
-_add_route(Route("AUHPT-INVTZ", "AUHPT", "INVTZ", 6150, "none", "Hay Point -> Visakhapatnam", 0.91, "monsoon", 1.2))
-_add_route(Route("AUNTL-INPRT", "AUNTL", "INPRT", 7050, "none", "Newcastle -> Paradip", 0.92, "monsoon", 1.1))
-_add_route(Route("AUNTL-INGVR", "AUNTL", "INGVR", 6900, "none", "Newcastle -> Gangavaram", 0.92, "monsoon", 1.0))
-_add_route(Route("AUDBY-INDHA", "AUDBY", "INDHA", 6350, "none", "Dalrymple Bay -> Dhamra", 0.90, "monsoon", 1.0))
-_add_route(Route("USORF-INPRT", "USORF", "INPRT", 12500, "good-hope", "Hampton Roads -> Paradip", 1.12, "atlantic", 0.6))
-_add_route(Route("USBAL-INVTZ", "USBAL", "INVTZ", 12650, "good-hope", "Baltimore -> Visakhapatnam", 1.12, "atlantic", 0.5))
+_add_route(Route("AUHPT-INPRT", "AUHPT", "INPRT", 6300, "none", "Hay Point -> Paradip", 0.82, "monsoon", 1.4))
+_add_route(Route("AUHPT-INVTZ", "AUHPT", "INVTZ", 6150, "none", "Hay Point -> Visakhapatnam", 0.83, "monsoon", 1.2))
+_add_route(Route("AUNTL-INPRT", "AUNTL", "INPRT", 7050, "none", "Newcastle -> Paradip", 0.85, "monsoon", 1.1))
+_add_route(Route("AUNTL-INGVR", "AUNTL", "INGVR", 6900, "none", "Newcastle -> Gangavaram", 0.85, "monsoon", 1.0))
+_add_route(Route("AUDBY-INDHA", "AUDBY", "INDHA", 6350, "none", "Dalrymple Bay -> Dhamra", 0.85, "monsoon", 1.0))
+_add_route(Route("USORF-INPRT", "USORF", "INPRT", 12500, "good-hope", "Hampton Roads -> Paradip", 1.00, "atlantic", 0.6))
+_add_route(Route("USBAL-INVTZ", "USBAL", "INVTZ", 12650, "good-hope", "Baltimore -> Visakhapatnam", 1.00, "atlantic", 0.5))
 _add_route(Route("MZMPM-INPRT", "MZMPM", "INPRT", 5250, "none", "Maputo -> Paradip", 0.85, "indian-ocean", 0.7))
 _add_route(Route("MZBEW-INVTZ", "MZBEW", "INVTZ", 5050, "none", "Beira -> Visakhapatnam", 0.88, "indian-ocean", 0.5))
 _add_route(Route("IDMBR-INPRT", "IDMBR", "INPRT", 3250, "none", "Muara Berau -> Paradip", 0.70, "monsoon", 1.6))

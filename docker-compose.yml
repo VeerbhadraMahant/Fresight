@@ -26,6 +26,8 @@ services:
       args:
         VITE_API_BASE: ""                  # same-origin /api, proxied by nginx
     image: freightsight-web
+    environment:
+      API_UPSTREAM: backend:8000           # nginx proxies /api/ here
     depends_on:
       backend:
         condition: service_healthy

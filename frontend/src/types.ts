@@ -39,8 +39,10 @@ export interface RouteRef {
 export interface Provenance {
   mode: string;
   note: string;
-  attempted_sources: string[];
-  live_points: { label: string; url: string; value: number; role?: string }[];
+  data_sources: Record<string, string>;
+  snapshot_date: string | null;
+  refreshing: boolean;
+  weather_ports: string[];
   history_start: string;
   history_end: string;
   series_count: number;
@@ -69,10 +71,13 @@ export interface VesselOption {
   voyage_days_roundtrip: number;
   freight_usd_per_t: number;
   expected_wait_days: number;
+  weather_delay_days: number;
   demurrage_risk_usd_per_t: number;
   delivered_cost_usd_per_t: number;
   total_campaign_cost_usd: number;
   campaign_lead_time_days: number;
+  co2_kt_campaign: number;
+  co2_g_per_t_nm: number;
   score: number;
 }
 
@@ -93,7 +98,10 @@ export interface Forecast {
     folds: number;
     fold_horizon_weeks: number;
     ensemble: { mape: number | null; rmse: number | null; bias: number | null };
+    ensemble_weight_holt_winters: number;
     models: Record<string, { mape: number | null; rmse: number | null; bias: number | null }>;
+    baselines: Record<string, { mape: number | null; rmse: number | null; bias: number | null }>;
+    skill_vs_random_walk_pct: number | null;
   };
   drivers: Record<string, number | null>;
 }
@@ -167,6 +175,54 @@ export interface RiskAlert {
   detected_at: string;
 }
 
+export interface StrategyStat {
+  avg_usd_t: number;
+  volatility_usd_t: number;
+  worst_usd_t: number;
+}
+
+export interface DecisionBacktestSummary {
+  timed_vs_spot_cost_pct: number;
+  timed_vs_spot_volatility_pct: number;
+  period_vs_spot_volatility_pct: number;
+  worst_period_spot_usd_t: number;
+  worst_period_timed_usd_t: number;
+  max_spike_avoided_usd_t: number;
+  period_locks: number;
+  spot_periods: number;
+  timely_locks: number;
+}
+
+export interface DecisionBacktest {
+  route_id: string;
+  vessel: string;
+  contract_months: number;
+  decision_points: number;
+  curve: {
+    date: string;
+    choice: "SPOT" | "PERIOD";
+    spot: number;
+    period: number;
+    timed: number;
+    spot_cum: number;
+    period_cum: number;
+    timed_cum: number;
+  }[];
+  strategies: {
+    always_spot: StrategyStat;
+    always_period: StrategyStat;
+    timed_cover: StrategyStat;
+  };
+  summary: DecisionBacktestSummary;
+}
+
+export interface Emissions {
+  recommended_kt: number;
+  recommended_g_per_t_nm: number;
+  greenest_feasible: string;
+  recommended_vs_greenest_pct: number;
+}
+
 export interface ScenarioResponse {
   request: ScenarioRequest;
   resolved: { route_id: string; vessel: string; lane: string; has_market_series: boolean };
@@ -183,15 +239,65 @@ export interface ScenarioResponse {
       potential_saving_vs_worst_feasible_usd: number | null;
     } | null;
     options: VesselOption[];
+    robustness: Record<string, number>;
+    emissions: Emissions | null;
     bunker_used_usd_t: number;
   };
   forecast: Forecast | null;
   timing: Timing | null;
   idle_outlook: IdleOutlook | null;
+  decision_backtest: {
+    strategies: DecisionBacktest["strategies"];
+    summary: DecisionBacktestSummary;
+    decision_points: number;
+  } | null;
+  weather: { expected_delay_days_16d: number; high_wind_days: number; heavy_rain_days: number } | null;
   risk_alerts: {
     scoped: RiskAlert[];
     all_count: number;
     severity_counts: Record<string, number>;
+  };
+}
+
+export interface RequirementItem {
+  origin: string;
+  destination: string;
+  commodity?: string;
+  tonnes: number;
+  laycan_month?: number | null;
+}
+
+export interface PlanRequest {
+  requirements: RequirementItem[];
+  horizon_months: number;
+}
+
+export interface PlanResponse {
+  horizon_months: number;
+  lanes: {
+    route_id: string;
+    lane: string;
+    commodity: string;
+    tonnes: number;
+    vessel: string;
+    period_cover_pct: number;
+    spot_pct: number;
+    period_rate_usd_t: number;
+    expected_spot_usd_t: number;
+    forecast_slope_pct: number;
+    plan_cost_usd: number;
+    all_spot_cost_usd: number;
+    saving_usd: number;
+    co2_kt: number;
+  }[];
+  totals: {
+    plan_cost_usd: number;
+    all_spot_cost_usd: number;
+    expected_saving_usd: number;
+    expected_saving_pct: number;
+    cost_risk_reduction_usd: number;
+    total_co2_kt: number;
+    tonnes: number;
   };
 }
 

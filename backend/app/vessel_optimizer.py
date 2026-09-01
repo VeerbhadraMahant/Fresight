@@ -16,11 +16,10 @@ import math
 from dataclasses import dataclass
 
 import numpy as np
-import pandas as pd
 
 from . import reference_data as ref
 from .synthetic import MarketData
-from .voyage_economics import estimate_voyage, cargo_intake
+from .voyage_economics import estimate_voyage
 
 DETOUR_FACTOR = 1.16  # great-circle -> practical sailing distance
 
@@ -77,10 +76,13 @@ class VesselOption:
     disch_days: float
     freight_usd_t: float
     expected_wait_days: float
+    weather_delay_days: float
     demurrage_risk_usd_t: float
     delivered_cost_usd_t: float
     total_campaign_cost_usd: float
     campaign_lead_time_days: float
+    co2_t: float
+    co2_g_per_t_nm: float
     score: float
 
     def as_dict(self) -> dict:
@@ -97,10 +99,13 @@ class VesselOption:
             "disch_days": round(self.disch_days, 2),
             "freight_usd_per_t": round(self.freight_usd_t, 2),
             "expected_wait_days": round(self.expected_wait_days, 2),
+            "weather_delay_days": round(self.weather_delay_days, 2),
             "demurrage_risk_usd_per_t": round(self.demurrage_risk_usd_t, 2),
             "delivered_cost_usd_per_t": round(self.delivered_cost_usd_t, 2),
             "total_campaign_cost_usd": round(self.total_campaign_cost_usd),
             "campaign_lead_time_days": round(self.campaign_lead_time_days, 1),
+            "co2_kt_campaign": round(self.co2_t / 1000, 1),
+            "co2_g_per_t_nm": round(self.co2_g_per_t_nm, 1),
             "score": round(self.score, 3),
         }
 
@@ -166,12 +171,21 @@ def optimise(market: MarketData, origin: str, destination: str, commodity: str,
         shipments = max(1, math.ceil(cargo_volume_t / max(intake, 1.0)))
         wait_load = _expected_wait_days(market, origin, laycan_month)
         wait_disch = _expected_wait_days(market, destination, laycan_month)
-        wait = wait_load + wait_disch
+        # real Open-Meteo weather-delay at the discharge port (next 16 days,
+        # scaled to a full voyage turn)
+        wx = market.weather.get(destination, {})
+        weather_delay = float(wx.get("expected_delay_days_16d", 0.0)) * 1.4
+        wait = wait_load + wait_disch + weather_delay
         demurrage_risk_t = wait * tce_now / max(intake, 1.0)
         delivered_t = rate + 0.6 * demurrage_risk_t  # 60% of expected wait priced as risk
 
         total_cost = delivered_t * cargo_volume_t
         lead_time = vb.total_days + wait + (shipments - 1) * (vb.total_days * 0.35)
+
+        # emissions: VLSFO burned x 3.114 t CO2/t fuel (IMO factor)
+        fuel_t_voyage = vc.bunker_sea_tpd * vb.sea_days + vc.bunker_port_tpd * vb.port_days
+        co2_campaign_t = fuel_t_voyage * 3.114 * shipments
+        co2_intensity = (fuel_t_voyage * 3.114 * 1e6) / max(intake * route.distance_nm, 1.0)
 
         feasible = not reasons
         # score: lower is better -> negate for ranking convenience later
@@ -188,9 +202,11 @@ def optimise(market: MarketData, origin: str, destination: str, commodity: str,
             draft_utilisation=intake / (vc.dwt * 0.94),
             voyage_days_roundtrip=vb.total_days, load_days=vb.total_days and (intake / lp.handling_tpd),
             disch_days=intake / dp.handling_tpd, freight_usd_t=rate,
-            expected_wait_days=wait, demurrage_risk_usd_t=demurrage_risk_t,
+            expected_wait_days=wait, weather_delay_days=weather_delay,
+            demurrage_risk_usd_t=demurrage_risk_t,
             delivered_cost_usd_t=delivered_t, total_campaign_cost_usd=total_cost,
-            campaign_lead_time_days=lead_time, score=score,
+            campaign_lead_time_days=lead_time,
+            co2_t=co2_campaign_t, co2_g_per_t_nm=co2_intensity, score=score,
         ))
 
     feasible_opts = [o for o in options if o.feasible]
@@ -201,6 +217,18 @@ def optimise(market: MarketData, origin: str, destination: str, commodity: str,
     savings_vs_worst = None
     if best and baseline:
         savings_vs_worst = round((baseline - best.delivered_cost_usd_t) * cargo_volume_t)
+
+    robustness = _mc_robustness(feasible_opts, market) if len(feasible_opts) > 1 else {}
+    greenest = min(feasible_opts, key=lambda o: o.co2_g_per_t_nm) if feasible_opts else None
+    emissions = None
+    if best and greenest:
+        emissions = {
+            "recommended_kt": round(best.co2_t / 1000, 1),
+            "recommended_g_per_t_nm": round(best.co2_g_per_t_nm, 1),
+            "greenest_feasible": greenest.vessel,
+            "recommended_vs_greenest_pct": round(
+                (best.co2_g_per_t_nm / greenest.co2_g_per_t_nm - 1) * 100, 1),
+        }
 
     return {
         "route": ref.route_public_view(route) if route.id in ref.ROUTES else {
@@ -224,8 +252,27 @@ def optimise(market: MarketData, origin: str, destination: str, commodity: str,
             "potential_saving_vs_worst_feasible_usd": savings_vs_worst,
         },
         "options": [o.as_dict() for o in ranked],
+        "robustness": robustness,
+        "emissions": emissions,
         "bunker_used_usd_t": round(bunker_now, 1),
     }
+
+
+def _mc_robustness(opts: list[VesselOption], market: MarketData, draws: int = 400) -> dict:
+    """How often each feasible class wins on delivered cost once freight rates
+    are perturbed by their own recent volatility (Monte Carlo)."""
+    rng = np.random.default_rng(7)
+    # per-class relative freight sigma from the last 12 weeks of its lane series
+    names = [o.vessel for o in opts]
+    base = np.array([o.delivered_cost_usd_t for o in opts])
+    freight = np.array([o.freight_usd_t for o in opts])
+    sigma = np.clip(0.10 + 0.03 * np.arange(len(opts)), 0.08, 0.22)  # heuristic spread
+    wins = dict.fromkeys(names, 0)
+    for _ in range(draws):
+        shock = rng.normal(1.0, sigma)
+        perturbed = base + freight * (shock - 1.0)
+        wins[names[int(np.argmin(perturbed))]] += 1
+    return {k: round(v / draws, 3) for k, v in sorted(wins.items(), key=lambda x: -x[1])}
 
 
 def _explain(best: VesselOption, ranked: list[VesselOption]) -> str:

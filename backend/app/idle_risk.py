@@ -182,7 +182,7 @@ def scan_risks(market: MarketData, max_alerts: int = 25) -> dict:
             {"vlsfo_now": round(float(b.iloc[-1]), 1), "change_30d_pct": round(chg_30 * 100, 1)}))
 
     # ---- 4. seasonal demand trough (next 8 weeks) ----------------- #
-    for prof in set(r.seasonality_profile for r in ref.ROUTES.values()):
+    for prof in {r.seasonality_profile for r in ref.ROUTES.values()}:
         up = _upcoming_seasonal(prof, 8)
         mn = min(up, key=lambda x: x[1])
         if mn[1] < 0.96:

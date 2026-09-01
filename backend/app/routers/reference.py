@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-import numpy as np
 import pandas as pd
 from fastapi import APIRouter
 
@@ -41,15 +40,20 @@ def commodities():
 
 @router.get("/market/provenance")
 def provenance():
-    STORE.require()
+    m = STORE.require()
     p = STORE.provenance
     return {
-        "mode": p.mode, "note": p.note, "attempted_sources": p.attempted,
-        "live_points": p.live_points, "generated_at": p.generated_at,
-        "history_start": str(STORE.data.freight.index[0].date()),
-        "history_end": str(STORE.data.freight.index[-1].date()),
-        "series_count": STORE.data.freight.shape[1],
-        "daily_rows": int(STORE.data.freight.shape[0]),
+        "mode": p.mode,
+        "note": p.note,
+        "data_sources": p.data_sources,
+        "snapshot_date": p.snapshot_date,
+        "refreshing": p.refreshing,
+        "weather_ports": sorted(m.weather.keys()),
+        "generated_at": p.generated_at,
+        "history_start": str(m.freight.index[0].date()),
+        "history_end": str(m.freight.index[-1].date()),
+        "series_count": m.freight.shape[1],
+        "daily_rows": int(m.freight.shape[0]),
     }
 
 

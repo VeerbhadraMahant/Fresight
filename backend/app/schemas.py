@@ -33,3 +33,17 @@ class ScenarioRequest(BaseModel):
     laycan_month: int | None = None
     vessel: str | None = Field(None, description="pin a vessel; otherwise the optimiser's pick is used")
     forecast_horizon_days: int = 90
+
+
+class RequirementItem(BaseModel):
+    origin: str
+    destination: str
+    commodity: str = "Thermal Coal"
+    tonnes: float = Field(..., gt=0)
+    laycan_month: int | None = Field(None, ge=1, le=12)
+
+
+class PlanRequest(BaseModel):
+    """A forward procurement plan: several cargo requirements over a horizon."""
+    requirements: list[RequirementItem] = Field(..., min_length=1)
+    horizon_months: int = Field(6, ge=1, le=18)

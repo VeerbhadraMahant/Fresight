@@ -25,8 +25,8 @@ import pandas as pd
 from .synthetic import MarketData
 
 try:
-    from statsmodels.tsa.holtwinters import ExponentialSmoothing
     from statsmodels.tools.sm_exceptions import ConvergenceWarning, ValueWarning
+    from statsmodels.tsa.holtwinters import ExponentialSmoothing
     _HAS_SM = True
 except Exception:  # pragma: no cover
     _HAS_SM = False
@@ -75,59 +75,95 @@ def _seasonal_naive_drift(train: pd.Series, steps: int) -> np.ndarray:
     if len(train) >= SEASON_WEEKS + 8:
         last_year = train.iloc[-SEASON_WEEKS:].to_numpy()
         recent_level = train.iloc[-8:].mean()
-        year_ago_level = train.iloc[-SEASON_WEEKS - 8:-SEASON_WEEKS].mean() if len(train) >= SEASON_WEEKS + 16 else recent_level
-        rebase = recent_level / max(year_ago_level, 1e-6)
+        year_ago_level = (train.iloc[-SEASON_WEEKS - 8:-SEASON_WEEKS].mean()
+                          if len(train) >= SEASON_WEEKS + 16 else recent_level)
+        rebase = float(np.clip(recent_level / max(year_ago_level, 1e-6), 0.8, 1.25))
         drift = np.polyfit(np.arange(12), train.iloc[-12:].to_numpy(), 1)[0]
         out = []
         for h in range(1, steps + 1):
             base = last_year[(h - 1) % SEASON_WEEKS] * rebase
-            out.append(base + drift * h * 0.4)
+            # small, capped drift -- extrapolating a trend 6+ months out is noise
+            out.append(base + drift * min(h, 6) * 0.2)
         return np.asarray(out, dtype=float)
     return np.repeat(train.iloc[-4:].mean(), steps)
 
 
-def _ensemble_forecast(train: pd.Series, steps: int) -> dict[str, np.ndarray]:
+def _ensemble_forecast(train: pd.Series, steps: int, w_hw: float = 0.5) -> dict[str, np.ndarray]:
     hw = _fit_holt_winters(train, steps)
     sn = _seasonal_naive_drift(train, steps)
-    ens = 0.5 * hw + 0.5 * sn
+    ens = w_hw * hw + (1.0 - w_hw) * sn
     return {"holt_winters": hw, "seasonal_naive": sn, "ensemble": ens}
 
 
 # --------------------------------------------------------------------------- #
+def _score(test: np.ndarray, pred: np.ndarray) -> tuple[float, float, float]:
+    err = test - pred
+    mape = float(np.mean(np.abs(err / np.clip(test, 1e-6, None))) * 100)
+    rmse = float(np.sqrt(np.mean(err ** 2)))
+    bias = float(np.mean(err))
+    return mape, rmse, bias
+
+
+def _agg(rows: list[tuple]) -> dict:
+    if not rows:
+        return {"mape": None, "rmse": None, "bias": None}
+    arr = np.array(rows)
+    return {"mape": round(float(arr[:, 0].mean()), 2),
+            "rmse": round(float(arr[:, 1].mean()), 2),
+            "bias": round(float(arr[:, 2].mean()), 2)}
+
+
 def _rolling_backtest(y: pd.Series, folds: int, fold_horizon: int) -> dict:
     n = len(y)
-    results: dict[str, list[float]] = {"holt_winters": [], "seasonal_naive": [], "ensemble": []}
-    resid_pool: list[float] = []
+    res: dict[str, list[tuple]] = {k: [] for k in
+                                   ("holt_winters", "seasonal_naive", "b_random_walk", "b_seasonal_naive")}
+    fold_preds: list[tuple] = []          # (test, hw_pred, sn_pred)
     first_train = max(MIN_TRAIN_WEEKS, n - folds * fold_horizon - fold_horizon)
     starts = list(range(first_train, n - fold_horizon + 1, fold_horizon))[-folds:]
     for s in starts:
         train, test = y.iloc[:s], y.iloc[s:s + fold_horizon]
         if len(test) < 2:
             continue
-        fc = _ensemble_forecast(train, len(test))
-        for name, pred in fc.items():
-            err = test.to_numpy() - pred
-            mape = float(np.mean(np.abs(err / np.clip(test.to_numpy(), 1e-6, None))) * 100)
-            rmse = float(np.sqrt(np.mean(err ** 2)))
-            bias = float(np.mean(err))
-            results[name].append((mape, rmse, bias))
-        resid_pool.extend((test.to_numpy() - fc["ensemble"]).tolist())
+        h = len(test)
+        tarr = test.to_numpy()
+        fc = _ensemble_forecast(train, h)
+        res["holt_winters"].append(_score(tarr, fc["holt_winters"]))
+        res["seasonal_naive"].append(_score(tarr, fc["seasonal_naive"]))
+        fold_preds.append((tarr, fc["holt_winters"], fc["seasonal_naive"]))
+        rw = np.repeat(train.iloc[-1], h)
+        sn = np.array([train.iloc[-SEASON_WEEKS + i % SEASON_WEEKS] if len(train) > SEASON_WEEKS
+                       else train.iloc[-1] for i in range(h)])
+        res["b_random_walk"].append(_score(tarr, rw))
+        res["b_seasonal_naive"].append(_score(tarr, sn))
 
-    def agg(rows: list[tuple]) -> dict:
-        if not rows:
-            return {"mape": None, "rmse": None, "bias": None}
-        arr = np.array(rows)
-        return {"mape": round(float(arr[:, 0].mean()), 2),
-                "rmse": round(float(arr[:, 1].mean()), 2),
-                "bias": round(float(arr[:, 2].mean()), 2)}
+    hw_m = _agg(res["holt_winters"])["mape"] or 20.0
+    sn_m = _agg(res["seasonal_naive"])["mape"] or 20.0
+    # inverse-squared-error ensemble weight, learned from the back-test:
+    # a model twice as accurate gets ~4x the weight
+    ih, isn = 1 / hw_m ** 2, 1 / sn_m ** 2
+    w_hw = float(np.clip(ih / (ih + isn), 0.1, 0.9))
 
+    ens_rows, resid_pool = [], []
+    for tarr, hwp, snp in fold_preds:
+        blend = w_hw * hwp + (1 - w_hw) * snp
+        ens_rows.append(_score(tarr, blend))
+        resid_pool.extend((tarr - blend).tolist())
+
+    ens = _agg(ens_rows)
+    rw = _agg(res["b_random_walk"])
+    skill = round((1 - ens["mape"] / rw["mape"]) * 100, 1) if (ens["mape"] and rw["mape"]) else None
     resid_std = float(np.std(resid_pool)) if resid_pool else float(y.pct_change().std() * y.mean())
     return {
         "folds": len(starts),
         "fold_horizon_weeks": fold_horizon,
-        "ensemble": agg(results["ensemble"]),
-        "models": {k: agg(v) for k, v in results.items() if k != "ensemble"},
+        "ensemble": ens,
+        "ensemble_weight_holt_winters": round(w_hw, 2),
+        "models": {"holt_winters": _agg(res["holt_winters"]),
+                   "seasonal_naive": _agg(res["seasonal_naive"])},
+        "baselines": {"random_walk": rw, "seasonal_naive": _agg(res["b_seasonal_naive"])},
+        "skill_vs_random_walk_pct": skill,
         "residual_std": resid_std,
+        "w_hw": w_hw,
     }
 
 
@@ -180,7 +216,7 @@ def _forecast_impl(market: MarketData, route_id: str, vessel: str,
     steps = max(4, int(round(horizon_days / 7)))
 
     bt = _rolling_backtest(y, folds=folds, fold_horizon=max(6, steps))
-    fc = _ensemble_forecast(y, steps)
+    fc = _ensemble_forecast(y, steps, w_hw=bt["w_hw"])
     mean = fc["ensemble"]
 
     resid_std = bt["residual_std"]
@@ -192,8 +228,8 @@ def _forecast_impl(market: MarketData, route_id: str, vessel: str,
     fdates = pd.date_range(y.index[-1] + pd.Timedelta(weeks=1), periods=steps, freq=WEEK)
     forecast_rows = [
         {"date": d.strftime("%Y-%m-%d"), "mean": round(float(m), 2),
-         "lo": round(float(l), 2), "hi": round(float(hh), 2)}
-        for d, m, l, hh in zip(fdates, mean, lo, hi)
+         "lo": round(float(lval), 2), "hi": round(float(hval), 2)}
+        for d, m, lval, hval in zip(fdates, mean, lo, hi, strict=False)
     ]
 
     fc_series = pd.Series(mean, index=fdates)
@@ -214,7 +250,6 @@ def _forecast_impl(market: MarketData, route_id: str, vessel: str,
 
     trailing_year = y.iloc[-52:]
     pct = float((trailing_year < y.iloc[-1]).mean() * 100)
-    prof = None
     from . import reference_data as ref
     sp = ref.ROUTES[route_id].seasonality_profile
     seasonal_now = ref.SEASONALITY[sp][pd.Timestamp.today().month - 1]
@@ -240,6 +275,6 @@ def _forecast_impl(market: MarketData, route_id: str, vessel: str,
         },
         "current_percentile_12m": round(pct, 0),
         "seasonal_factor_now": round(float(seasonal_now), 3),
-        "backtest": {k: v for k, v in bt.items() if k != "residual_std"},
+        "backtest": {k: v for k, v in bt.items() if k not in ("residual_std", "w_hw")},
         "drivers": _driver_diagnostics(market, route_id, vessel),
     }

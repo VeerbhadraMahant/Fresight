@@ -5,10 +5,12 @@ from __future__ import annotations
 from fastapi import APIRouter, HTTPException
 
 from .. import reference_data as ref
+from ..decision_backtest import decision_backtest as run_decision_backtest
 from ..forecasting import forecast as run_forecast
 from ..idle_risk import idle_outlook, scan_risks
 from ..market_store import STORE
-from ..schemas import ScenarioRequest, TimingRequest, VesselOptimiseRequest
+from ..procurement_planner import plan as run_plan
+from ..schemas import PlanRequest, ScenarioRequest, TimingRequest, VesselOptimiseRequest
 from ..timing import recommend as run_timing
 from ..vessel_optimizer import optimise as run_optimise
 
@@ -33,7 +35,7 @@ def vessel_optimise(req: VesselOptimiseRequest):
             use_forecast_horizon_days=req.use_forecast_horizon_days,
         )
     except ValueError as e:
-        raise HTTPException(400, str(e))
+        raise HTTPException(400, str(e)) from e
 
 
 @router.post("/timing/recommend")
@@ -46,7 +48,7 @@ def timing_recommend(req: TimingRequest):
             volume_t=req.volume_t, risk_aversion=req.risk_aversion,
         )
     except ValueError as e:
-        raise HTTPException(400, str(e))
+        raise HTTPException(400, str(e)) from e
 
 
 @router.get("/risk/scan")
@@ -60,7 +62,26 @@ def idle(route_id: str, vessel: str):
     try:
         return idle_outlook(m, route_id, vessel)
     except ValueError as e:
-        raise HTTPException(400, str(e))
+        raise HTTPException(400, str(e)) from e
+
+
+@router.get("/backtest/decisions")
+def backtest_decisions(route_id: str, vessel: str, contract_months: int = 3):
+    m = STORE.require()
+    try:
+        return run_decision_backtest(m, route_id, vessel, contract_months=contract_months)
+    except ValueError as e:
+        raise HTTPException(400, str(e)) from e
+
+
+@router.post("/plan")
+def procurement_plan(req: PlanRequest):
+    m = STORE.require()
+    try:
+        return run_plan(m, [r.model_dump() for r in req.requirements],
+                        horizon_months=req.horizon_months)
+    except ValueError as e:
+        raise HTTPException(400, str(e)) from e
 
 
 @router.post("/scenario")
@@ -89,6 +110,15 @@ def scenario(req: ScenarioRequest):
                       volume_t=req.cargo_volume_t, precomputed_fc=fc)
            if has_market else None)
     idle = idle_outlook(m, route_id, vessel) if route_id in ref.ROUTES else None
+    dbt = None
+    if has_market:
+        try:
+            _db = run_decision_backtest(m, route_id, vessel,
+                                        contract_months=req.contract_duration_months)
+            dbt = {"strategies": _db["strategies"], "summary": _db["summary"],
+                   "decision_points": _db["decision_points"]}
+        except ValueError:
+            dbt = None
     risks = scan_risks(m, max_alerts=40)
     scoped = [a for a in risks["alerts"]
               if a["scope"].get("route_id") == route_id
@@ -105,6 +135,8 @@ def scenario(req: ScenarioRequest):
         "forecast": fc,
         "timing": tim,
         "idle_outlook": idle,
+        "decision_backtest": dbt,
+        "weather": m.weather.get(req.destination),
         "risk_alerts": {"scoped": scoped, "all_count": risks["alert_count"],
                         "severity_counts": risks["severity_counts"]},
     }

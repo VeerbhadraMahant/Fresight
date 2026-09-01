@@ -13,7 +13,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
-from .reference_data import PORTS, ROUTES, VESSEL_CLASSES, Route, VesselClass, Port
+from .reference_data import PORTS, ROUTES, VESSEL_CLASSES, Port, Route, VesselClass
 
 COMMISSION = 0.0375          # address commission + brokerage on gross freight
 PORT_TURN_DAYS = 2.0         # berthing, survey, draft-survey, shifting buffer per voyage

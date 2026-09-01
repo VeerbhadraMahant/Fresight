@@ -137,3 +137,55 @@ def test_forecast_intervals_widen_with_horizon(client):
         "route_id": "IDMBR-INVTZ", "vessel": "Supramax", "horizon_days": 120}).json()
     spans = [row["hi"] - row["lo"] for row in j["forecast"]]
     assert spans[-1] >= spans[0]  # uncertainty grows further out
+
+
+def test_forecast_backtest_reports_baselines(client):
+    j = client.get("/api/forecast", params={
+        "route_id": "AUHPT-INPRT", "vessel": "Capesize", "horizon_days": 120}).json()
+    bt = j["backtest"]
+    assert bt["baselines"]["random_walk"]["mape"] is not None
+    assert bt["baselines"]["seasonal_naive"]["mape"] is not None
+    assert 0.1 <= bt["ensemble_weight_holt_winters"] <= 0.9
+    assert bt["skill_vs_random_walk_pct"] is not None
+    assert 3.0 < bt["ensemble"]["mape"] < 35.0
+    # the learned blend is no worse than its weaker component
+    worse = max(m["mape"] for m in bt["models"].values())
+    assert bt["ensemble"]["mape"] <= worse + 1e-6
+
+
+def test_scenario_has_emissions_robustness_and_backtest(client):
+    j = client.post("/api/scenario", json={
+        "origin": "AUHPT", "destination": "INPRT", "cargo_volume_t": 600_000,
+        "contract_duration_months": 6, "forecast_horizon_days": 120}).json()
+    vo = j["vessel_optimisation"]
+    assert vo["emissions"]["recommended_kt"] > 0
+    assert abs(sum(vo["robustness"].values()) - 1.0) < 0.01
+    assert vo["options"][0]["co2_g_per_t_nm"] > 0
+    assert set(j["decision_backtest"]["strategies"]) == {
+        "always_spot", "always_period", "timed_cover"}
+
+
+def test_decision_backtest_endpoint(client):
+    j = client.get("/api/backtest/decisions", params={
+        "route_id": "IDMBR-INVTZ", "vessel": "Supramax", "contract_months": 6}).json()
+    assert j["decision_points"] >= 4
+    assert len(j["curve"]) == j["decision_points"]
+    # locking period cover reduces cost volatility vs rolling spot
+    assert j["summary"]["period_vs_spot_volatility_pct"] >= -5
+
+
+def test_procurement_plan(client):
+    j = client.post("/api/plan", json={"requirements": [
+        {"origin": "AUHPT", "destination": "INPRT", "tonnes": 900_000},
+        {"origin": "IDMBR", "destination": "INVTZ", "tonnes": 400_000},
+    ], "horizon_months": 6}).json()
+    assert len(j["lanes"]) == 2
+    assert j["totals"]["tonnes"] == 1_300_000
+    for lane in j["lanes"]:
+        assert 20 <= lane["period_cover_pct"] <= 80
+
+
+def test_provenance_reports_data_sources(client):
+    j = client.get("/api/reference/market/provenance").json()
+    assert j["mode"] in ("hybrid", "synthetic")
+    assert set(j["data_sources"]) == {"freight_index", "bunker", "port_activity", "weather"}

@@ -1,72 +1,62 @@
 """Market data provider.
 
-On startup, makes a best-effort fetch of *public* Baltic Dry Index values and
-records them as a sanity reference (shown in the dashboard header). If the
-network is unavailable or a page changes shape, it falls back cleanly and runs
-fully offline. Either way the app serves a complete, self-consistent dataset.
+Builds the market dataset by blending:
+  * real public feeds -- Breakwave dry-bulk freight index, Brent->VLSFO, IMF
+    PortWatch port activity, Open-Meteo weather (see `datasources/`) -- from a
+    committed snapshot, refreshed live when the APIs are reachable; and
+  * the offline voyage-economics + stochastic engine (`synthetic.py`) that
+    turns those drivers into a full route x vessel history calibrated to
+    published 2024-25 route rates and real port constraints.
 
-The live points are reference-only -- the historical series, back-tests and
-forecasts are entirely driven by the offline voyage-economics + stochastic
-engine (`synthetic.py`), calibrated to published 2024-25 route rates.
+Startup is instant (snapshot); a background thread then does a short live
+refresh and swaps in the updated dataset.
 
-Set FREIGHTSIGHT_SKIP_LIVE_PROBE=1 to disable the outbound request entirely.
+Set FREIGHTSIGHT_SKIP_LIVE_PROBE=1 to skip all outbound requests (snapshot +
+synthetic only) -- the default inside the container.
 """
 
 from __future__ import annotations
 
 import logging
 import os
-import re
+import threading
 from dataclasses import dataclass, field
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 
-import httpx
-
+from .datasources import load_real_data
 from .synthetic import MarketData, generate
 
 log = logging.getLogger("freightsight.market")
 
-# Skip the outbound probe entirely (e.g. locked-down deploy) with
-# FREIGHTSIGHT_SKIP_LIVE_PROBE=1. The app is fully functional without it.
 _SKIP_PROBE = os.getenv("FREIGHTSIGHT_SKIP_LIVE_PROBE", "").strip() in {"1", "true", "yes"}
-_PROBE_TIMEOUT = float(os.getenv("FREIGHTSIGHT_PROBE_TIMEOUT", "4.0"))
-
-_PUBLIC_SOURCES = [
-    # (label, url, regex capturing a numeric value, plausible (lo, hi) range)
-    ("Baltic Dry Index", "https://tradingeconomics.com/commodity/baltic",
-     r'Baltic (?:Dry|Exchange Dry) Index[^0-9]{0,40}?([0-9]{3,5}(?:\.[0-9]+)?)', (400, 6000)),
-    ("Baltic Dry Index (handybulk)", "https://www.handybulk.com/baltic-dry-index/",
-     r'Baltic Dry Index[^0-9]{0,80}?([0-9]{3,5}(?:\.[0-9]+)?)', (400, 6000)),
-]
 
 
 @dataclass
 class Provenance:
-    mode: str = "synthetic"                       # "synthetic" | "synthetic+live-anchor"
-    live_points: list[dict] = field(default_factory=list)
-    attempted: list[str] = field(default_factory=list)
+    mode: str = "synthetic"                     # "hybrid" | "synthetic"
+    data_sources: dict[str, str] = field(default_factory=dict)
+    snapshot_date: str | None = None
+    refreshing: bool = False
     generated_at: str = ""
     note: str = ""
 
+    # kept for backwards-compat with the dashboard header
+    live_points: list[dict] = field(default_factory=list)
+    attempted: list[str] = field(default_factory=list)
 
-def _try_public_sources(timeout: float = _PROBE_TIMEOUT) -> list[dict]:
-    found: list[dict] = []
-    headers = {"User-Agent": "Mozilla/5.0 (FreightSight prototype; +https://sih)"}
-    for label, url, pattern, (lo, hi) in _PUBLIC_SOURCES:
-        try:
-            r = httpx.get(url, headers=headers, timeout=timeout, follow_redirects=True)
-            r.raise_for_status()
-            m = re.search(pattern, r.text, re.IGNORECASE | re.DOTALL)
-            if m and lo <= float(m.group(1)) <= hi:
-                found.append({"label": label, "url": url, "value": float(m.group(1)),
-                              "unit": "index", "role": "reference-only",
-                              "fetched_at": datetime.now(timezone.utc).isoformat()})
-                log.info("live source ok: %s = %s", label, m.group(1))
-            elif m:
-                log.warning("live source %s value %s outside plausible range", label, m.group(1))
-        except Exception as exc:  # noqa: BLE001 - best effort only
-            log.warning("live source failed (%s): %s", label, exc)
-    return found
+
+def _note(mode: str, refreshing: bool) -> str:
+    base = (
+        "Freight rates follow the real Breakwave dry-bulk index; bunkers track Brent; "
+        "port congestion comes from IMF PortWatch daily port-activity data; weather-delay "
+        "risk uses live Open-Meteo forecasts. A voyage-economics model plus a stochastic "
+        "overlay turns these drivers into a per route x vessel history calibrated to "
+        "published 2024-25 route rates and real port constraints."
+    )
+    if mode == "synthetic":
+        return ("Real feeds unavailable -- running the offline voyage-economics + stochastic "
+                "engine only, calibrated to published 2024-25 route rates.")
+    return base + (" Live refresh in progress." if refreshing else "")
 
 
 class MarketStore:
@@ -75,36 +65,45 @@ class MarketStore:
     def __init__(self) -> None:
         self.data: MarketData | None = None
         self.provenance = Provenance()
+        self._lock = threading.Lock()
 
     def build(self) -> None:
-        live = []
-        attempted = [] if _SKIP_PROBE else [label for label, *_ in _PUBLIC_SOURCES]
-        if _SKIP_PROBE:
-            log.info("live-source probe disabled (FREIGHTSIGHT_SKIP_LIVE_PROBE)")
-        else:
-            try:
-                live = _try_public_sources()
-            except Exception as exc:  # noqa: BLE001
-                log.warning("public source probe crashed: %s", exc)
+        real = load_real_data(live_refresh=False)   # instant: committed snapshot
+        data = generate(real=real)
+        will_refresh = not _SKIP_PROBE and real.snapshot_date is not None
+        self._install(data, refreshing=will_refresh)
+        log.info("market dataset built: %d series, mode=%s, sources=%s",
+                 data.freight.shape[1], self.provenance.mode, data.provenance)
 
-        self.data = generate()
-        self.provenance = Provenance(
-            mode="synthetic+live-anchor" if live else "synthetic",
-            live_points=live,
-            attempted=attempted,
-            generated_at=datetime.now(timezone.utc).isoformat(),
-            note=(
-                "All series (history, back-tests, forecasts) are produced by the offline "
-                "voyage-economics + stochastic engine, calibrated to published 2024-25 "
-                "route rates and real port constraints. "
-                + ("Live public indices below were reachable and are shown as a sanity "
-                   "reference for demo day; they do not alter the modelled series."
-                   if live else
-                   "Live public indices were unreachable; running fully offline.")
-            ),
-        )
-        log.info("market dataset built: %s rows, mode=%s",
-                 len(self.data.freight), self.provenance.mode)
+        if will_refresh:
+            threading.Thread(target=self._background_refresh, daemon=True,
+                             name="realdata-refresh").start()
+
+    def _background_refresh(self) -> None:
+        try:
+            real = load_real_data(live_refresh=True)
+            data = generate(real=real)
+            self._install(data, refreshing=False)
+            log.info("market dataset refreshed: sources=%s", data.provenance)
+        except Exception as exc:
+            log.warning("background refresh failed: %s", exc)
+            with self._lock:
+                self.provenance.refreshing = False
+
+    def _install(self, data: MarketData, *, refreshing: bool) -> None:
+        live = any(v not in ("synthetic", "disabled", "") and "synthetic" not in str(v)
+                   for v in data.provenance.values())
+        mode = "hybrid" if live else "synthetic"
+        with self._lock:
+            self.data = data
+            self.provenance = Provenance(
+                mode=mode,
+                data_sources=dict(data.provenance),
+                snapshot_date=data.real_snapshot_date,
+                refreshing=refreshing,
+                generated_at=datetime.now(UTC).isoformat(),
+                note=_note(mode, refreshing),
+            )
 
     def require(self) -> MarketData:
         if self.data is None:

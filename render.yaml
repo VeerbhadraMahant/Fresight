@@ -1,0 +1,36 @@
+# Render.com blueprint — one public URL for the dashboard.
+# In the Render dashboard: New > Blueprint > pick this repo.
+#
+#   freightsight-web  (public)  -> serves the SPA, proxies /api to ...
+#   freightsight-api  (private) -> the FastAPI backend
+#
+# No CORS, no VITE_API_BASE: the browser only ever talks to freightsight-web.
+
+services:
+  - type: web
+    name: freightsight-api
+    runtime: docker
+    repo: https://github.com/VeerbhadraMahant/SIH-2026
+    dockerfilePath: ./backend/Dockerfile
+    dockerContext: ./backend
+    plan: free
+    healthCheckPath: /api/health
+    envVars:
+      - key: FREIGHTSIGHT_SKIP_LIVE_PROBE
+        value: "1"
+      - key: FREIGHTSIGHT_LOG_LEVEL
+        value: INFO
+
+  - type: web
+    name: freightsight-web
+    runtime: docker
+    repo: https://github.com/VeerbhadraMahant/SIH-2026
+    dockerfilePath: ./frontend/Dockerfile
+    dockerContext: ./frontend
+    plan: free
+    envVars:
+      - key: API_UPSTREAM
+        fromService:
+          type: web
+          name: freightsight-api
+          property: hostport

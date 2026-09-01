@@ -33,17 +33,34 @@ export function VesselPanel({ opt }: { opt: ScenarioResponse["vessel_optimisatio
             </div>
           </div>
           <p className="caption mt-3 max-w-3xl">{rec.why}</p>
-          {rec.potential_saving_vs_worst_feasible_usd != null && (
-            <p className="mt-2 font-sans text-[13px] text-graphite">
-              Up to <span className="link">{usdCompact(rec.potential_saving_vs_worst_feasible_usd)}</span> vs the
-              worst feasible class.
-            </p>
-          )}
+          <div className="mt-3 flex flex-wrap gap-x-6 gap-y-1 font-sans text-[13px] text-graphite">
+            {rec.potential_saving_vs_worst_feasible_usd != null && (
+              <span>
+                up to <span className="link">{usdCompact(rec.potential_saving_vs_worst_feasible_usd)}</span> vs
+                worst feasible class
+              </span>
+            )}
+            {opt.robustness?.[rec.vessel] != null && (
+              <span>
+                optimal in{" "}
+                <span className="figure">{Math.round(opt.robustness[rec.vessel] * 100)}%</span> of simulated
+                rate paths
+              </span>
+            )}
+            {opt.emissions && (
+              <span>
+                <span className="figure">{opt.emissions.recommended_kt} kt</span> CO₂ ·{" "}
+                {opt.emissions.recommended_vs_greenest_pct === 0
+                  ? "greenest feasible class"
+                  : `+${opt.emissions.recommended_vs_greenest_pct}% vs ${opt.emissions.greenest_feasible}`}
+              </span>
+            )}
+          </div>
         </div>
       )}
 
       <div className="overflow-x-auto">
-        <table className="obs-table min-w-[720px]">
+        <table className="obs-table min-w-[820px]">
           <thead>
             <tr>
               <th>Class</th>
@@ -54,13 +71,15 @@ export function VesselPanel({ opt }: { opt: ScenarioResponse["vessel_optimisatio
               <th className="text-right">Freight $/t</th>
               <th className="text-right">Wait d</th>
               <th className="text-right">Delivered $/t</th>
-              <th className="text-right">Campaign</th>
+              <th className="text-right">CO₂ g/t·nm</th>
+              <th className="text-right">Robust</th>
               <th>Status</th>
             </tr>
           </thead>
           <tbody>
             {opt.options.map((o) => {
               const isRec = rec?.vessel === o.vessel;
+              const robust = opt.robustness?.[o.vessel];
               return (
                 <tr
                   key={o.vessel}
@@ -73,9 +92,18 @@ export function VesselPanel({ opt }: { opt: ScenarioResponse["vessel_optimisatio
                   <td className="num text-right">{o.governing_draft_m} m</td>
                   <td className="num text-right">{o.draft_utilisation_pct}%</td>
                   <td className="num text-right">${o.freight_usd_per_t}</td>
-                  <td className="num text-right">{o.expected_wait_days}</td>
+                  <td
+                    className="num text-right"
+                    title={o.weather_delay_days ? `incl. ${o.weather_delay_days} d weather delay` : undefined}
+                  >
+                    {o.expected_wait_days}
+                    {o.weather_delay_days > 0 && <span className="text-ember"> ◦</span>}
+                  </td>
                   <td className="num text-right font-medium text-graphite">${o.delivered_cost_usd_per_t}</td>
-                  <td className="num text-right">{usdCompact(o.total_campaign_cost_usd)}</td>
+                  <td className="num text-right">{o.co2_g_per_t_nm}</td>
+                  <td className="num text-right">
+                    {robust != null ? `${Math.round(robust * 100)}%` : "—"}
+                  </td>
                   <td>
                     {o.feasible ? (
                       <span className="inline-flex items-center gap-1.5 text-steel">

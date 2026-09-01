@@ -17,6 +17,7 @@ frontend/dist/
 Thumbs.db
 
 # Runtime
-*.log 
+*.log
+backend/.cache/
 
 /docs

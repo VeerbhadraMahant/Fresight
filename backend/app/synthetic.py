@@ -23,12 +23,16 @@ Everything is seeded, so the dataset is reproducible.
 from __future__ import annotations
 
 from dataclasses import dataclass, field
+from typing import TYPE_CHECKING
 
 import numpy as np
 import pandas as pd
 
 from . import reference_data as ref
 from .voyage_economics import estimate_voyage
+
+if TYPE_CHECKING:  # pragma: no cover
+    from .datasources import RealData
 
 SEED = 20260831
 HISTORY_YEARS = 3.5
@@ -43,8 +47,11 @@ class MarketData:
     tce: pd.DataFrame          # index=date, columns=vessel -> USD/day
     congestion: pd.DataFrame   # index=date, columns=port_code -> waiting days
     drivers: pd.DataFrame      # index=date, columns=[commodity_index, global_ip, sentiment]
+    provenance: dict[str, str] = field(default_factory=dict)  # component -> data source
+    weather: dict[str, dict] = field(default_factory=dict)    # discharge port -> weather outlook
+    real_snapshot_date: str | None = None
     generated_at: pd.Timestamp = field(default_factory=lambda: pd.Timestamp.now(tz="UTC"))
-    source: str = "synthetic-engine-v1"
+    source: str = "hybrid-engine-v1"
 
     # ---- convenience accessors ------------------------------------------- #
     def freight_series(self, route_id: str, vessel: str) -> pd.Series:
@@ -112,7 +119,6 @@ def _inject_recent_events(freight: pd.DataFrame, vlsfo: pd.Series,
                           rng: np.random.Generator) -> None:
     """Overlay a few plausible near-term events on the last ~6 weeks."""
     n = len(freight)
-    idx = freight.index
 
     # (a) congestion build-up at Paradip over the last 18 days
     k = n - 18
@@ -141,12 +147,15 @@ def _inject_recent_events(freight: pd.DataFrame, vlsfo: pd.Series,
                 (1 + np.linspace(0, 0.09, n - k))
 
 
-def generate(seed: int = SEED) -> MarketData:
+def generate(seed: int = SEED, real: RealData | None = None) -> MarketData:
     rng = np.random.default_rng(seed)
     start = (TODAY - pd.Timedelta(days=int(HISTORY_YEARS * 365.25))).normalize()
     dates = pd.date_range(start, TODAY, freq="D")
     n = len(dates)
     t = np.arange(n)
+
+    def _align(s):
+        return s.reindex(dates).interpolate("linear").ffill().bfill() if s is not None else None
 
     # ---- macro: bunker (VLSFO) price -------------------------------------- #
     # mean-reverting to a slowly-drifting anchor, with fat-tailed shocks
@@ -160,6 +169,25 @@ def generate(seed: int = SEED) -> MarketData:
         decay = np.exp(-np.arange(n - k) / rng.uniform(25, 60))
         dev[k:] += mag * decay
     vlsfo = pd.Series(np.clip(anchor + dev, 320, None), index=dates, name="vlsfo_usd_t")
+
+    # ---- REAL: bunker price (Brent -> VLSFO) --------------------------- #
+    if real is not None and real.vlsfo is not None:
+        rv = _align(real.vlsfo)
+        # real level + a little synthetic daily texture
+        vlsfo = (rv + (vlsfo - vlsfo.rolling(30, min_periods=1).mean()) * 0.3).clip(320, None)
+        vlsfo.name = "vlsfo_usd_t"
+
+    # ---- REAL: dry-bulk freight regime (Breakwave BDRY) --------------- #
+    # BDRY vs its own trailing mean, then re-centred so the mean over our window
+    # is 1.0 -- this contributes the *shape* of the real dry-bulk cycle without
+    # shifting the calibrated level.
+    if real is not None and real.dry_bulk_index is not None:
+        bd = _align(real.dry_bulk_index)
+        bf = (bd / bd.rolling(400, min_periods=45).mean()).clip(0.55, 1.9).to_numpy()
+        bf = np.nan_to_num(bf, nan=1.0)
+        bdry_factor = bf / max(np.nanmean(bf), 1e-6)
+    else:
+        bdry_factor = np.ones(n)
 
     # ---- macro drivers -------------------------------------------------- #
     commodity_index = 100 + np.cumsum(_ar1(n, 0.98, 0.35, rng)) + 8 * np.sin(2 * np.pi * t / 365.25)
@@ -204,7 +232,13 @@ def generate(seed: int = SEED) -> MarketData:
             k = rng.integers(0, n)
             dur = rng.integers(6, 22)
             q[k:k + dur] += rng.uniform(1.5, 5.0)
-        congestion[code] = np.clip(q, 0.2, None)
+        q = np.clip(q, 0.2, None)
+
+        # REAL: IMF PortWatch cargo-call intensity -> waiting days (where covered)
+        if real is not None and code in real.port_congestion:
+            rc = _align(real.port_congestion[code]).to_numpy()
+            q = 0.78 * rc + 0.22 * q
+        congestion[code] = q
     congestion = pd.DataFrame(congestion, index=dates)
 
     # ---- freight rate per route x vessel ----------------------------- #
@@ -236,19 +270,28 @@ def generate(seed: int = SEED) -> MarketData:
             cong_cost_t = cong_days * tce[vessel].to_numpy() / max(intake, 1.0)
 
             noise = _ar1(n, 0.9, 1.0, rng) * (0.010 * fund) * vol
-            level = (fund * route_seas / route_seas.mean()) * (1 + basis) + cong_cost_t + noise
-            level = np.clip(level, 0.35 * fund, 3.5 * fund)
+            # real dry-bulk cycle (BDRY) drives the freight regime (mean ~1.0);
+            # flat 1.0 when the feed is unavailable
+            regime = 0.45 + 0.55 * bdry_factor
+            level = (fund * regime * route_seas / route_seas.mean()) * (1 + basis) + cong_cost_t + noise
+            level = np.clip(level, 0.30 * fund, 4.0 * fund)
             cols[(route_id, vessel)] = level
 
     freight = pd.DataFrame(cols, index=dates)
     freight.columns = pd.MultiIndex.from_tuples(freight.columns, names=["route_id", "vessel"])
 
-    # ---- deterministic "current conditions" so the live risk feed has -- #
-    # something to show on demo day (a congestion event, a bunker move, a
-    # couple of volatile lanes). These are recent-window only.
-    _inject_recent_events(freight, vlsfo, congestion, tce, rng)
+    # ---- deterministic "current conditions" -------------------------- #
+    # Only when running without real feeds -- with real data the recent window
+    # already carries genuine bunker / congestion / freight movement.
+    if real is None:
+        _inject_recent_events(freight, vlsfo, congestion, tce, rng)
 
+    prov = dict(real.sources) if real is not None else dict.fromkeys(
+        ("freight_index", "bunker", "port_activity", "weather"), "synthetic")
     return MarketData(
         freight=freight, bunker=vlsfo, tce=tce, congestion=congestion, drivers=drivers,
+        provenance=prov,
+        weather=dict(real.weather) if real is not None else {},
+        real_snapshot_date=real.snapshot_date if real is not None else None,
         generated_at=pd.Timestamp.now(tz="UTC"),
     )

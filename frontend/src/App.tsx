@@ -4,18 +4,22 @@ import type {
   MarketSnapshot,
   PortRef,
   Provenance,
+  RouteRef,
   ScenarioRequest,
   ScenarioResponse,
   VesselRef,
 } from "./types";
-import { TopBar } from "./components/TopBar";
+import { TopBar, type View } from "./components/TopBar";
 import { ScenarioPanel } from "./components/ScenarioPanel";
 import { StatStrip, type Stat } from "./components/StatStrip";
 import { ForecastPanel } from "./components/ForecastPanel";
 import { VesselPanel } from "./components/VesselPanel";
 import { TimingPanel } from "./components/TimingPanel";
+import { CoverTimingPanel } from "./components/CoverTimingPanel";
 import { IdlePanel } from "./components/IdlePanel";
 import { RiskFeed } from "./components/RiskFeed";
+import { PlanView } from "./components/PlanView";
+import { BacktestView } from "./components/BacktestView";
 import { pct, usdCompact } from "./lib/format";
 
 const DEFAULT_SCENARIO: ScenarioRequest = {
@@ -30,9 +34,11 @@ const DEFAULT_SCENARIO: ScenarioRequest = {
 };
 
 export default function App() {
+  const [view, setView] = useState<View>("scenario");
   const [loadPorts, setLoadPorts] = useState<PortRef[]>([]);
   const [dischargePorts, setDischargePorts] = useState<PortRef[]>([]);
   const [vessels, setVessels] = useState<VesselRef[]>([]);
+  const [routes, setRoutes] = useState<RouteRef[]>([]);
   const [provenance, setProvenance] = useState<Provenance | null>(null);
   const [snapshot, setSnapshot] = useState<MarketSnapshot | null>(null);
 
@@ -57,15 +63,17 @@ export default function App() {
   useEffect(() => {
     (async () => {
       try {
-        const [p, v, prov, snap] = await Promise.all([
+        const [p, v, r, prov, snap] = await Promise.all([
           api.ports(),
           api.vessels(),
+          api.routes(),
           api.provenance(),
           api.snapshot(),
         ]);
         setLoadPorts(p.load_ports);
         setDischargePorts(p.discharge_ports);
         setVessels(v);
+        setRoutes(r);
         setProvenance(prov);
         setSnapshot(snap);
         await run(DEFAULT_SCENARIO);
@@ -83,6 +91,7 @@ export default function App() {
     const fc = result.forecast;
     const tim = result.timing;
     const io = result.idle_outlook;
+    const db = result.decision_backtest;
     const latest = fc?.latest_rate ?? 0;
     const exp90 = fc?.expected_rate.next_90d ?? 0;
     const fcDelta = latest ? ((exp90 - latest) / latest) * 100 : 0;
@@ -97,15 +106,16 @@ export default function App() {
       {
         label: "Campaign cost",
         value: rec ? usdCompact(rec.estimated_campaign_cost_usd) : "—",
-        sub:
-          rec?.potential_saving_vs_worst_feasible_usd != null
-            ? `${usdCompact(rec.potential_saving_vs_worst_feasible_usd)} vs worst`
-            : undefined,
+        sub: result.vessel_optimisation.emissions
+          ? `${result.vessel_optimisation.emissions.recommended_kt} kt CO₂`
+          : undefined,
       },
       {
         label: "Forecast 90d",
         value: fc ? `$${exp90}/t` : "—",
-        sub: fc ? `${fcDelta <= 0 ? "▼" : "▲"} ${pct(fcDelta)} · now $${latest}/t` : "no traded series",
+        sub: fc
+          ? `${fcDelta <= 0 ? "▼" : "▲"} ${pct(fcDelta)} · MAPE ${fc.backtest.ensemble.mape}%`
+          : "no traded series",
       },
       {
         label: "Charter call",
@@ -113,13 +123,9 @@ export default function App() {
         sub: tim ? `entry — ${tim.entry_timing.action.replace("_", " ")}` : undefined,
       },
       {
-        label: "Saving vs spot",
-        value: tim ? usdCompact(tim.vs_reactive_spot_approach.expected_saving_usd) : "—",
-        sub: tim
-          ? `${pct(tim.vs_reactive_spot_approach.expected_saving_pct)} · risk ${usdCompact(
-              -Math.abs(tim.vs_reactive_spot_approach.risk_reduction_usd),
-            )}`
-          : undefined,
+        label: "Cost-vol cut",
+        value: db ? `${db.summary.period_vs_spot_volatility_pct}%` : "—",
+        sub: db ? "period cover vs spot, back-tested" : undefined,
       },
       {
         label: "Idle-risk index",
@@ -131,49 +137,78 @@ export default function App() {
 
   return (
     <div className="min-h-dvh bg-canvas">
-      <TopBar snapshot={snapshot} provenance={provenance} />
+      <TopBar snapshot={snapshot} provenance={provenance} view={view} onView={setView} />
 
-      {/* intro + scenario */}
       <section className="band-canvas">
-        <div className="shell py-14 md:py-16">
+        <div className="shell py-12 md:py-14">
           <span className="eyebrow">FreightSight</span>
-          <h1 className="display mt-3 max-w-4xl text-graphite">
-            From reactive spot fixtures to a predictive chartering strategy
-          </h1>
-          <p className="lede mt-5 max-w-2xl">
-            Freight-rate forecasting, vessel-type optimisation against real port constraints, market-entry
-            timing and idle-risk management for bulk cargo to India&apos;s East Coast ports.
-          </p>
+          {view === "scenario" && (
+            <>
+              <h1 className="display mt-3 max-w-4xl text-graphite">
+                From reactive spot fixtures to a predictive chartering strategy
+              </h1>
+              <p className="lede mt-5 max-w-2xl">
+                Freight-rate forecasting, vessel-type optimisation against real port constraints,
+                market-entry timing and idle-risk management for bulk cargo to India&apos;s East
+                Coast ports — over real dry-bulk, bunker, port-activity and weather feeds.
+              </p>
 
-          <div className="mt-10">
-            {booting ? (
-              <div className="card">
-                <p className="caption">Building the market dataset — voyage-economics + stochastic engine…</p>
+              <div className="mt-10">
+                {booting ? (
+                  <div className="card">
+                    <p className="caption">Building the market dataset — real feeds + voyage-economics engine…</p>
+                  </div>
+                ) : (
+                  <ScenarioPanel
+                    loadPorts={loadPorts}
+                    dischargePorts={dischargePorts}
+                    vessels={vessels}
+                    value={scenario}
+                    onChange={setScenario}
+                    onSubmit={() => run(scenario)}
+                    loading={loading}
+                  />
+                )}
+                {error && (
+                  <div className="mt-5 border border-graphite bg-canvas p-5">
+                    <span className="font-display tracking-[-0.02em] text-graphite">Request failed.</span>{" "}
+                    <span className="caption">{error}</span>
+                  </div>
+                )}
               </div>
-            ) : (
-              <ScenarioPanel
-                loadPorts={loadPorts}
-                dischargePorts={dischargePorts}
-                vessels={vessels}
-                value={scenario}
-                onChange={setScenario}
-                onSubmit={() => run(scenario)}
-                loading={loading}
-              />
-            )}
-            {error && (
-              <div className="mt-5 border border-graphite bg-canvas p-5">
-                <span className="font-display tracking-[-0.02em] text-graphite">Request failed.</span>{" "}
-                <span className="caption">{error}</span>
+            </>
+          )}
+
+          {view === "plan" && (
+            <>
+              <h1 className="h-section mt-3 max-w-3xl">Forward procurement planning</h1>
+              <p className="lede mt-4 max-w-2xl">
+                Turn a set of forward cargo requirements into a recommended contract mix — the shift
+                from many single spot fixtures to fewer medium-term multiple-voyage contracts.
+              </p>
+              <div className="mt-10">
+                {!booting && <PlanView loadPorts={loadPorts} dischargePorts={dischargePorts} />}
               </div>
-            )}
-          </div>
+            </>
+          )}
+
+          {view === "backtest" && (
+            <>
+              <h1 className="h-section mt-3 max-w-3xl">Cover-timing back-test</h1>
+              <p className="lede mt-4 max-w-2xl">
+                Walk-forward validation: what rolling spot, standing period cover and our timed engine
+                would each have cost over the last two years.
+              </p>
+              <div className="mt-10">
+                {!booting && <BacktestView routes={routes} vessels={vessels} />}
+              </div>
+            </>
+          )}
         </div>
       </section>
 
-      {result && stats && (
+      {view === "scenario" && result && stats && (
         <>
-          {/* KPI band */}
           <section className="band-ash">
             <div className="shell py-14">
               <div className="mb-6 flex items-baseline justify-between">
@@ -186,7 +221,6 @@ export default function App() {
             </div>
           </section>
 
-          {/* analysis band */}
           <section className="band-canvas">
             <div className="shell space-y-14 py-16">
               {result.forecast ? (
@@ -196,8 +230,8 @@ export default function App() {
                   <h2 className="h-section">Freight forecast</h2>
                   <p className="caption mt-3 max-w-2xl">
                     No traded freight series for {result.resolved.route_id} / {result.resolved.vessel}.
-                    Forecasting &amp; timing are shown only for modelled lanes; the vessel optimisation below
-                    uses the voyage-economics model.
+                    Forecasting, timing &amp; the cover-timing test are shown only for modelled lanes;
+                    the vessel optimisation below uses the voyage-economics model.
                   </p>
                 </div>
               )}
@@ -205,10 +239,16 @@ export default function App() {
               <VesselPanel opt={result.vessel_optimisation} />
 
               {result.timing && <TimingPanel t={result.timing} />}
+
+              {result.decision_backtest && (
+                <CoverTimingPanel
+                  db={result.decision_backtest}
+                  months={result.request.contract_duration_months}
+                />
+              )}
             </div>
           </section>
 
-          {/* idle + risk band */}
           <section className="band-ash">
             <div className="shell grid gap-8 py-14 lg:grid-cols-2">
               {result.idle_outlook ? (
@@ -232,8 +272,9 @@ export default function App() {
       <footer className="band-canvas border-t border-mist">
         <div className="shell py-8">
           <p className="meta">
-            SIH 2026 prototype · synthetic market calibrated to published 2024–25 route rates &amp; real port
-            constraints · not for operational chartering
+            SIH 2026 prototype · real feeds (Breakwave dry-bulk index, Brent, IMF PortWatch,
+            Open-Meteo) blended with a voyage-economics + stochastic engine calibrated to published
+            2024–25 route rates &amp; real port constraints · not for operational chartering
           </p>
         </div>
       </footer>
