@@ -101,18 +101,30 @@ frontend/  Vite + React + TypeScript + Tailwind + Recharts  ("Ventriloc" editori
 
 ---
 
-## Running it
+## Deploy
 
-### Option A — Docker (one command)
+**Recommended — Render Blueprint** (free, public URL, ~5 min, nothing to manage):
+
+1. Push `main` to GitHub.
+2. <https://dashboard.render.com> → **New → Blueprint** → pick this repo.
+3. Render reads `render.yaml`, creates `freightsight-api` (Docker) + `freightsight-web`
+   (static site) with the API base and CORS allow-list wired to the deterministic
+   `*.onrender.com` URLs — **no manual step**. Click **Apply**.
+4. Open the `freightsight-web` URL — that's the link to share. API docs at
+   `freightsight-api`'s URL + `/docs`.
+
+> Free tier: the API spins down when idle; the first hit after a pause takes ~10–20 s.
+> Use the $7 Starter plan for an always-on demo.
+
+**Alternative — Docker Compose** (VM or laptop; one URL, nginx proxies `/api`, no CORS):
 
 ```bash
-docker compose up --build      # dashboard → :8080 · API/docs → :8000/docs
+docker compose up --build -d      # dashboard → :8080 · API/docs → :8000/docs
 ```
 
-`frontend` (nginx) serves the built SPA and proxies `/api` to `backend`. The container keeps
-the committed real-data snapshot but skips outbound refresh.
+Full runbook, VM setup, verification and troubleshooting: **`deployment.md`** (git-ignored).
 
-### Option B — local dev
+## Running it locally
 
 ```bash
 # backend  (Python 3.11+, tested on 3.13)
@@ -128,15 +140,11 @@ cd frontend && npm install && npm run dev    # http://localhost:5173  (proxies /
 
 Start the backend first. No internet required — the committed snapshot carries real numbers.
 
-### Deploy
-
-`render.yaml` is a Render blueprint (two Docker services, one public URL, no CORS). See
-`docs/` or the deployment notes for VM / PaaS options.
-
 ### Configuration
 
 | Variable | Where | Default | Purpose |
 |---|---|---|---|
+| `PORT` | backend / nginx | `8000` / `80` | listen port (PaaS platforms inject it) |
 | `FREIGHTSIGHT_CORS_ORIGINS` | backend | `*` | comma-separated allowed origins |
 | `FREIGHTSIGHT_LOG_LEVEL` | backend | `INFO` | log verbosity |
 | `FREIGHTSIGHT_SKIP_LIVE_PROBE` | backend | `0` (`1` in Docker) | keep snapshot, skip live refresh |
