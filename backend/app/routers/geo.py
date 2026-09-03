@@ -9,11 +9,9 @@ from __future__ import annotations
 
 from fastapi import APIRouter, HTTPException, Query
 
-from .. import __version__
-from ..db import DB_ENABLED, healthcheck
 from ..geo import lane as lane_mod
 from ..geo import ports as port_reg
-from ..geo.searoute import graph_stats, sea_route
+from ..geo.searoute import sea_route
 from ..market_store import STORE
 from ..reference_data import VESSEL_ORDER
 
@@ -85,20 +83,4 @@ def geo_lane(
         commodity=commodity, cargo_volume_t=cargo_volume_t,
     )
 
-
-@router.get("/system/health", tags=["meta"])
-def system_health():
-    reg = port_reg.REGISTRY
-    prov = STORE.provenance
-    return {
-        "version": __version__,
-        "database": {"configured": DB_ENABLED, **healthcheck()},
-        "ports": {"count": reg.count(), "backend": reg.backend},
-        "searoute": graph_stats(),
-        "market": {
-            "mode": prov.mode,
-            "snapshot_date": prov.snapshot_date,
-            "refreshing": prov.refreshing,
-            "data_sources": prov.data_sources,
-        },
-    }
+# /api/system/* and /api/internal/* now live in routers/system.py

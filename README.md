@@ -77,7 +77,7 @@ backend/  FastAPI + pandas + statsmodels
     reference_data.py    ports, vessel classes, trade routes, commodities, seasonality
     voyage_economics.py  bottom-up voyage estimate
     synthetic.py         hybrid market engine (blends real feeds + stochastic overlay)
-    market_store.py      startup: snapshot → build; background live refresh & swap
+    market_store.py      startup: snapshot → build; reload() from DB; live refresh when no DB
     forecasting.py       HW + seasonal-naive ensemble (learned weights), rolling-origin
                          back-test, baselines, memoised
     vessel_optimizer.py  constraints engine + Monte-Carlo robustness + CO₂
@@ -86,16 +86,20 @@ backend/  FastAPI + pandas + statsmodels
     procurement_planner.py  multi-cargo contract-mix optimiser
     idle_risk.py         idle outlook + market-wide alert scan
     db/                  SQLAlchemy models + engine (optional Postgres / Supabase;
-                         app runs from bundled CSV when DATABASE_URL is unset)
+                         app runs from bundled CSV + committed snapshot when DATABASE_URL is unset)
     geo/                 global port registry + resolver, sea-route waypoint graph,
                          any-port-to-any-port voyage economics
     data/ports_global.csv   ~130 major world ports (merged with the 18 curated ports)
     routers/             /api/reference/*  ·  /api/{forecast,vessel,timing,risk,idle,
                          backtest/decisions,plan,scenario}  ·  /api/reference/ports/search,
-                         /api/reference/port  ·  /api/geo/{route,lane}  ·  /api/system/health
-  alembic/               schema migrations (0001 initial)
-  tests/                 test_smoke.py (19) + test_geo.py (22) end-to-end API tests
-  scripts/  build_real_snapshot.py · load_ports.py (seed) · import_wpi.py (real NGA Pub 150)
+                         /api/reference/port  ·  /api/geo/{route,lane}  ·
+                         /api/system/{health,ingest-runs}  ·  /api/internal/refresh
+  worker/ingest.py       self-updating pipeline — fetch feeds → feed_snapshots →
+                         freight_rates / rate_forecasts / alerts history (runs in GitHub Actions */15)
+  alembic/               migrations 0001 (core + geo) · 0002 (Phase 2 history)
+  tests/                 test_smoke.py (19) + test_geo.py (22) + test_worker.py (6)
+  scripts/  build_real_snapshot.py · load_ports.py (seed) · import_wpi.py · start.sh (container entrypoint)
+  .github/workflows/  ci.yml · ingest.yml (*/15) · keepwarm.yml (*/10)
   Dockerfile · pyproject.toml (ruff) · pytest.ini · alembic.ini · requirements*.txt · .env.example
 
 frontend/  Vite + React + TypeScript + Tailwind + Recharts  ("Ventriloc" editorial theme)

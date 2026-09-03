@@ -24,6 +24,7 @@ from dataclasses import dataclass, field
 from datetime import UTC, datetime
 
 from .datasources import load_real_data
+from .db import DB_ENABLED
 from .synthetic import MarketData, generate
 
 log = logging.getLogger("freightsight.market")
@@ -68,16 +69,29 @@ class MarketStore:
         self._lock = threading.Lock()
 
     def build(self) -> None:
-        real = load_real_data(live_refresh=False)   # instant: committed snapshot
+        # load_real_data() prefers the ingest worker's freshest DB snapshot when a
+        # database is configured, else the committed file.
+        real = load_real_data(live_refresh=False)
         data = generate(real=real)
-        will_refresh = not _SKIP_PROBE and real.snapshot_date is not None
+        # Only do our own in-process HTTP refresh when there is no database -- when
+        # DB-backed, the ingest worker (worker/ingest.py) owns freshness.
+        will_refresh = not _SKIP_PROBE and not DB_ENABLED and real.snapshot_date is not None
         self._install(data, refreshing=will_refresh)
-        log.info("market dataset built: %d series, mode=%s, sources=%s",
-                 data.freight.shape[1], self.provenance.mode, data.provenance)
+        log.info("market dataset built: %d series, mode=%s, db=%s, sources=%s",
+                 data.freight.shape[1], self.provenance.mode, DB_ENABLED, data.provenance)
 
         if will_refresh:
             threading.Thread(target=self._background_refresh, daemon=True,
                              name="realdata-refresh").start()
+
+    def reload(self) -> str:
+        """Rebuild from the current best source (the worker's latest DB snapshot
+        when DB-backed). Cheap -- no outbound HTTP. Used by POST /api/internal/refresh."""
+        real = load_real_data(live_refresh=False)
+        self._install(generate(real=real), refreshing=False)
+        log.info("market dataset reloaded: mode=%s, as_of=%s",
+                 self.provenance.mode, self.provenance.snapshot_date)
+        return self.provenance.snapshot_date or "unknown"
 
     def _background_refresh(self) -> None:
         try:

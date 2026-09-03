@@ -62,12 +62,14 @@ def _s(d: dict | None) -> pd.Series | None:
     return pd.Series(d, dtype=float).pipe(lambda s: s.set_axis(pd.to_datetime(s.index))).sort_index()
 
 
-def _from_snapshot(rd: RealData) -> None:
-    try:
-        snap = json.loads(SNAPSHOT.read_text())
-    except Exception as exc:
-        log.warning("no real-data snapshot (%s); running synthetic-only", exc)
-        return
+def _ser(s: pd.Series | None) -> dict | None:
+    if s is None:
+        return None
+    return {d.strftime("%Y-%m-%d"): round(float(v), 4) for d, v in s.items() if v == v}
+
+
+def _apply_snapshot_dict(rd: RealData, snap: dict) -> None:
+    """Load a snapshot dict (same shape as ``real_snapshot.json``) into ``rd``."""
     rd.snapshot_date = (snap.get("built_at") or "")[:10] or None
     rd.dry_bulk_index = _s(snap.get("dry_bulk_index"))
     rd.vlsfo = _s(snap.get("vlsfo"))
@@ -76,6 +78,63 @@ def _from_snapshot(rd: RealData) -> None:
     for code, ser in (snap.get("port_demand") or {}).items():
         rd.port_demand[code] = _s(ser)
     rd.weather = dict(snap.get("weather") or {})
+
+
+def snapshot_dict(rd: RealData) -> dict:
+    """Serialise a RealData back to the ``real_snapshot.json`` shape (for the worker)."""
+    return {
+        "built_at": (rd.snapshot_date or "") + "T00:00:00Z" if rd.snapshot_date else "",
+        "dry_bulk_index": _ser(rd.dry_bulk_index),
+        "vlsfo": _ser(rd.vlsfo),
+        "port_congestion": {k: _ser(v) for k, v in rd.port_congestion.items()},
+        "port_demand": {k: _ser(v) for k, v in rd.port_demand.items()},
+        "weather": dict(rd.weather),
+    }
+
+
+def _from_snapshot_file(rd: RealData) -> bool:
+    try:
+        snap = json.loads(SNAPSHOT.read_text())
+    except Exception as exc:
+        log.warning("no real-data snapshot file (%s)", exc)
+        return False
+    _apply_snapshot_dict(rd, snap)
+    return True
+
+
+def _from_snapshot_db(rd: RealData) -> bool:
+    """Seed from the freshest ``feed_snapshots`` row the ingest worker wrote."""
+    try:
+        from ..db import DB_ENABLED, session_scope
+        from ..db.models import FeedSnapshot
+    except Exception:  # pragma: no cover - db layer optional
+        return False
+    if not DB_ENABLED:
+        return False
+    try:
+        from sqlalchemy import select
+
+        with session_scope() as s:
+            row = s.scalars(
+                select(FeedSnapshot)
+                .where(FeedSnapshot.feed == "realdata", FeedSnapshot.ok.is_(True))
+                .order_by(FeedSnapshot.fetched_at.desc())
+                .limit(1)
+            ).first()
+            if row is None or not row.payload:
+                return False
+            _apply_snapshot_dict(rd, row.payload)
+            log.info("real-data seeded from DB snapshot (as_of %s)", rd.snapshot_date)
+            return True
+    except Exception as exc:  # pragma: no cover - network dependent
+        log.info("DB snapshot unavailable (%s); falling back to file", str(exc)[:120])
+        return False
+
+
+def _from_snapshot(rd: RealData, *, prefer_db: bool = True) -> None:
+    if prefer_db and _from_snapshot_db(rd):
+        return
+    _from_snapshot_file(rd)
 
 
 def _live_refresh(rd: RealData) -> set[str]:
@@ -127,8 +186,12 @@ def _live_refresh(rd: RealData) -> set[str]:
     return fresh
 
 
-def load_real_data(live_refresh: bool = True) -> RealData:
-    """Committed real-data snapshot, optionally overlaid with a short live refresh.
+def load_real_data(live_refresh: bool = True, prefer_db: bool = True) -> RealData:
+    """Real-data bundle for the market model.
+
+    Source order: the ingest worker's freshest ``feed_snapshots`` row (when a
+    database is configured) -> the committed ``real_snapshot.json`` -> optionally
+    overlaid with a short direct live refresh.
 
     Set FREIGHTSIGHT_DISABLE_REALDATA=1 to skip even the snapshot (pure synthetic).
     """
@@ -138,7 +201,7 @@ def load_real_data(live_refresh: bool = True) -> RealData:
             ("freight_index", "bunker", "port_activity", "weather"), "disabled")
         return rd
 
-    _from_snapshot(rd)
+    _from_snapshot(rd, prefer_db=prefer_db)
     fresh = _live_refresh(rd) if (live_refresh and rd.snapshot_date) else set()
 
     def _tag(comp: str, have: bool) -> str:

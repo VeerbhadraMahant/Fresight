@@ -11,8 +11,9 @@ WORKDIR /app
 COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 
-# app code + committed real-data snapshot, DB migrations + seed scripts
+# app code + committed real-data snapshot, DB migrations, seed scripts, ingest worker
 COPY app ./app
+COPY worker ./worker
 COPY alembic ./alembic
 COPY alembic.ini ./alembic.ini
 COPY scripts ./scripts

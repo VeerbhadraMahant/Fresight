@@ -1,17 +1,21 @@
 """SQLAlchemy ORM models -- the persistent, self-updating state.
 
-Phase 1 uses ``ports``, ``lane_geometry`` and ``ingest_runs``. ``vessels``,
-``positions`` and ``voyages`` are defined now so the initial migration is
-complete; the live-monitoring pipeline (Phase 3) fills them.
+Phase 1 (migration 0001): ``ports``, ``lane_geometry``, ``ingest_runs`` (+ the
+Phase 3 stubs ``vessels`` / ``positions`` / ``voyages``).
+Phase 2 (migration 0002): ``feed_snapshots``, ``freight_rates``,
+``rate_forecasts``, ``alerts`` -- the self-updating history the ingest worker
+writes and the API reads.
 """
 
 from __future__ import annotations
 
-from datetime import datetime
+from datetime import date, datetime
 
 from sqlalchemy import (
     JSON,
+    BigInteger,
     Boolean,
+    Date,
     DateTime,
     Float,
     ForeignKey,
@@ -27,6 +31,11 @@ from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column
 
 class Base(DeclarativeBase):
     pass
+
+
+# BIGSERIAL on Postgres; plain INTEGER PRIMARY KEY on SQLite so it autoincrements
+# (SQLite only treats an exact "INTEGER PRIMARY KEY" column as a rowid alias).
+BigIntPk = BigInteger().with_variant(Integer, "sqlite")
 
 
 def _now() -> Mapped[datetime]:
@@ -161,7 +170,98 @@ class Voyage(Base):
     )
 
 
+# --------------------------------------------------------------------------- #
+# Phase 2 -- self-updating history (written by worker/ingest.py, read by the API)
+# --------------------------------------------------------------------------- #
+class FeedSnapshot(Base):
+    """One fetch of an external feed, kept so the API can seed itself from the
+    freshest real data the worker pulled (not the committed file) and for replay."""
+
+    __tablename__ = "feed_snapshots"
+
+    id: Mapped[int] = mapped_column(BigIntPk, primary_key=True, autoincrement=True)
+    feed: Mapped[str] = mapped_column(String(32), index=True)   # 'realdata' | 'bdry' | ...
+    fetched_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), index=True
+    )
+    as_of: Mapped[date | None] = mapped_column(Date)            # the data's own as-of date
+    ok: Mapped[bool] = mapped_column(Boolean, default=True)
+    payload: Mapped[dict] = mapped_column(JSON, default=dict)   # same shape as real_snapshot.json
+    meta: Mapped[dict | None] = mapped_column(JSON)             # {sources: {...}, ports: n}
+
+
+class FreightRate(Base):
+    """Accruing time-series of the modelled rate per lane x vessel -- one point
+    appended per ingest run, so the forecaster eventually trains on real history."""
+
+    __tablename__ = "freight_rates"
+
+    id: Mapped[int] = mapped_column(BigIntPk, primary_key=True, autoincrement=True)
+    route_id: Mapped[str] = mapped_column(String(40), index=True)
+    vessel: Mapped[str] = mapped_column(String(16))
+    ts: Mapped[date] = mapped_column(Date)                      # dataset as-of date
+    rate_usd_t: Mapped[float] = mapped_column(Float)
+    source: Mapped[str] = mapped_column(String(16), default="hybrid")  # hybrid | synthetic
+    run_id: Mapped[int | None] = mapped_column(Integer)
+
+    __table_args__ = (
+        UniqueConstraint("route_id", "vessel", "ts", name="uq_freight_rate_point"),
+        Index("ix_freight_rates_lane_ts", "route_id", "vessel", "ts"),
+    )
+
+
+class RateForecast(Base):
+    """A forecast as it was published on ``run_ts`` -- enables an honest,
+    walk-forward 'how good were we N weeks ago' back-test over real time."""
+
+    __tablename__ = "rate_forecasts"
+
+    id: Mapped[int] = mapped_column(BigIntPk, primary_key=True, autoincrement=True)
+    run_ts: Mapped[datetime] = mapped_column(DateTime(timezone=True), index=True)
+    route_id: Mapped[str] = mapped_column(String(40), index=True)
+    vessel: Mapped[str] = mapped_column(String(16))
+    latest_rate: Mapped[float | None] = mapped_column(Float)
+    exp_30d: Mapped[float | None] = mapped_column(Float)
+    exp_60d: Mapped[float | None] = mapped_column(Float)
+    exp_90d: Mapped[float | None] = mapped_column(Float)
+    lo_90d: Mapped[float | None] = mapped_column(Float)
+    hi_90d: Mapped[float | None] = mapped_column(Float)
+    model: Mapped[str | None] = mapped_column(String(48))
+    mape: Mapped[float | None] = mapped_column(Float)
+    skill_vs_rw_pct: Mapped[float | None] = mapped_column(Float)
+    run_id: Mapped[int | None] = mapped_column(Integer)
+
+    __table_args__ = (Index("ix_rate_forecasts_lane_run", "route_id", "vessel", "run_ts"),)
+
+
+class Alert(Base):
+    """Stateful risk feed: the same alert id seen across runs keeps one row with
+    ``opened_at`` / ``last_seen_at``; alerts that stop firing are marked expired."""
+
+    __tablename__ = "alerts"
+
+    id: Mapped[str] = mapped_column(String(96), primary_key=True)  # scan_risks' own id
+    category: Mapped[str] = mapped_column(String(40), index=True)
+    severity: Mapped[str] = mapped_column(String(12), index=True)
+    scope: Mapped[dict] = mapped_column(JSON, default=dict)
+    message: Mapped[str] = mapped_column(Text)
+    recommended_action: Mapped[str | None] = mapped_column(Text)
+    metrics: Mapped[dict | None] = mapped_column(JSON)
+    status: Mapped[str] = mapped_column(String(12), default="open", index=True)  # open | expired
+    opened_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now()
+    )
+    last_seen_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now()
+    )
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), onupdate=func.now()
+    )
+    expired_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+
+
 ALL_TABLES = [
     Port.__table__, LaneGeometry.__table__, IngestRun.__table__,
     Vessel.__table__, Position.__table__, Voyage.__table__,
+    FeedSnapshot.__table__, FreightRate.__table__, RateForecast.__table__, Alert.__table__,
 ]

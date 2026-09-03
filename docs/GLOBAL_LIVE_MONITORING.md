@@ -38,8 +38,20 @@ cron-job.org (*/10)  ──►  GET /api/system/health   (keep-warm)          Li
   - Endpoints: `/api/reference/ports/search`, `/api/reference/port`, `/api/geo/route`, `/api/geo/lane`, `/api/system/health`.
   - `scripts/load_ports.py` (seed), `scripts/import_wpi.py` (real NGA Pub 150 → same table).
   - 22 new tests; ruff + full suite green; existing views unchanged.
-- [ ] **Phase 2 — Self-updating pipeline** — `worker/ingest.py`, GitHub Actions cron, persisted
-      rate/forecast history, `ingest_runs`-driven freshness in `/api/system/health`.
+- [x] **Phase 2 — Self-updating pipeline**
+  - `alembic/` migration `0002` — `feed_snapshots`, `freight_rates`, `rate_forecasts`, `alerts`.
+  - `worker/ingest.py` — one pass: fetch external feeds → stash the bundle in `feed_snapshots`
+    → rebuild the hybrid dataset → append the latest rate per lane×vessel to `freight_rates`
+    → snapshot every forecast to `rate_forecasts` → upsert the risk scan into `alerts` (open/expired
+    lifecycle). Each step writes an `ingest_runs` row.
+  - `.github/workflows/ingest.yml` (`*/15`) runs the worker; `keepwarm.yml` (`*/10`) pings the API
+    and optionally POSTs `/api/internal/refresh`.
+  - `load_real_data()` now prefers the worker's freshest `feed_snapshots` row over the committed
+    file when a DB is configured; `market_store` skips its own HTTP refresh in that case
+    (the worker owns freshness) and gains `STORE.reload()`.
+  - `/api/system/health` reports per-feed freshness + `stale` flags + history counts;
+    `/api/system/ingest-runs`; token-guarded `POST /api/internal/refresh`.
+  - 6 new tests (subprocess-driven, real DB path); ruff + full suite green.
 - [ ] **Phase 3 — Live map** — AIS sampling + dead-reckoning, `positions` / `voyages`,
       react-leaflet map view, vessel/port interactions.
 - [ ] **Phase 4 — Polish** — system-status UI, provenance everywhere, deploy docs, tests.
@@ -55,10 +67,21 @@ cron-job.org (*/10)  ──►  GET /api/system/health   (keep-warm)          Li
 - `/api/geo/lane` has **no per-lane calibration** — it is a transparent bottom-up estimate.
   The curated East-Coast-India lanes keep their calibrated `/api/scenario` path.
 
-## Operator setup (when wiring the DB, Phase 2+)
+## Operator setup
 
-1. Create a Supabase project → copy the connection string.
-2. Render API service → env `DATABASE_URL=postgresql://...` (the container runs
-   `alembic upgrade head` + `load_ports.py` on boot when it is set).
-3. GitHub repo secrets: `DATABASE_URL`, `AISSTREAM_API_KEY`.
-4. cron-job.org → `GET https://<api>/api/system/health` every 10 min.
+Supabase project **Fresight** (`crqwjqupccutfsspdspi`, ap-southeast-1) is provisioned:
+schema at `0002`, `ports` seeded (204), RLS enabled on every table (no policies — the
+backend connects as table owner and bypasses RLS; the public anon API cannot read them).
+
+1. **`DATABASE_URL`** (Supabase → Connect → *Session pooler*) set as:
+   - Render `freightsight-api` env — on boot the container runs `alembic upgrade head`
+     + `load_ports.py` (both no-ops now), and the app serves from the DB.
+   - GitHub repo **Actions secret** — the ingest worker needs it.
+2. The **ingest** workflow runs every 15 min once the secret exists (or trigger it manually
+   from the Actions tab). Watch `feed_snapshots` / `freight_rates` / `ingest_runs` fill in.
+3. Optional: repo variable `FREIGHTSIGHT_API_URL` + secret `FREIGHTSIGHT_REFRESH_TOKEN`
+   (also set the same token on Render) to enable the keep-warm `/api/internal/refresh` POST.
+4. Phase 3 only: GitHub Actions secret `AISSTREAM_API_KEY`.
+
+Verify: `GET /api/system/health` → `self_updating: true`, `feeds.ingest.stale: false`,
+`history.freight_rate_points > 0`.

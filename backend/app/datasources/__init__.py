@@ -11,6 +11,6 @@ is unreachable the model falls back to its synthetic component and the
 provenance record says so.
 """
 
-from .provider import RealData, load_real_data
+from .provider import RealData, load_real_data, snapshot_dict
 
-__all__ = ["RealData", "load_real_data"]
+__all__ = ["RealData", "load_real_data", "snapshot_dict"]

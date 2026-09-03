@@ -1,0 +1,30 @@
+name: keepwarm
+
+# Pings the free-tier API so Render + Supabase don't idle out and the static
+# site's first load is warm. Optionally reloads the dataset from the latest DB
+# snapshot (set the FREIGHTSIGHT_API_URL and REFRESH_TOKEN repo variables/secrets).
+on:
+  schedule:
+    - cron: "*/10 * * * *"
+  workflow_dispatch: {}
+
+jobs:
+  ping:
+    runs-on: ubuntu-latest
+    timeout-minutes: 3
+    steps:
+      - name: warm /api/system/health
+        env:
+          API_URL: ${{ vars.FREIGHTSIGHT_API_URL || 'https://freightsight-api.onrender.com' }}
+        run: |
+          curl -fsS -m 40 "$API_URL/api/system/health" > /dev/null \
+            && echo "warmed $API_URL" || echo "ping failed (non-fatal)"
+      - name: reload dataset from DB snapshot (no-op unless the token secret is set)
+        env:
+          API_URL: ${{ vars.FREIGHTSIGHT_API_URL || 'https://freightsight-api.onrender.com' }}
+          TOKEN: ${{ secrets.FREIGHTSIGHT_REFRESH_TOKEN }}
+        run: |
+          if [ -z "$TOKEN" ]; then echo "no refresh token set; skipping"; exit 0; fi
+          curl -fsS -m 40 -X POST "$API_URL/api/internal/refresh" \
+            -H "X-Refresh-Token: $TOKEN" > /dev/null \
+            && echo "reloaded" || echo "reload failed (non-fatal)"
