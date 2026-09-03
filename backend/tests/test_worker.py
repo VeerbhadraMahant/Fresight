@@ -77,6 +77,18 @@ def test_worker_populates_history(seeded_db):
     assert row and row[0] and 0 < row[1] < 60 and row[2] > 0
 
 
+def test_worker_runs_ais_step_and_skips_without_key(seeded_db):
+    db, _ = seeded_db
+    # the AIS step always records an ingest_runs row; with no AISSTREAM_API_KEY
+    # it is a graceful skip (ok=1, rows=0) rather than a failure
+    row = sqlite3.connect(db).execute(
+        "SELECT ok, rows, detail FROM ingest_runs WHERE feed='ais' ORDER BY id DESC LIMIT 1"
+    ).fetchone()
+    assert row is not None
+    assert row[0] == 1 and row[1] == 0
+    assert "skip" in (row[2] or "").lower() or "api key" in (row[2] or "").lower()
+
+
 def test_worker_is_idempotent_and_accrues(seeded_db):
     db, env = seeded_db
     before_runs = _count(db, "SELECT count(*) FROM ingest_runs WHERE feed='ingest'")

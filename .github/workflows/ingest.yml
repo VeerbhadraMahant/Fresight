@@ -33,3 +33,6 @@ jobs:
           DATABASE_URL: ${{ secrets.DATABASE_URL }}
           FREIGHTSIGHT_LIVE_REFRESH_BUDGET: "150"
           FREIGHTSIGHT_LOG_LEVEL: INFO
+          # Phase 3 live map -- unset -> the AIS step is a graceful no-op
+          AISSTREAM_API_KEY: ${{ secrets.AISSTREAM_API_KEY }}
+          AIS_SAMPLE_SECONDS: "180"

@@ -131,6 +131,9 @@ class Vessel(Base):
     beam_m: Mapped[float | None] = mapped_column(Float)
     draft_m: Mapped[float | None] = mapped_column(Float)
     flag: Mapped[str | None] = mapped_column(String(2))
+    nav_status: Mapped[str | None] = mapped_column(String(32))     # last reported AIS nav status
+    destination: Mapped[str | None] = mapped_column(String(120))   # free-text AIS destination
+    eta_raw: Mapped[str | None] = mapped_column(String(32))        # AIS ETA as reported (MM-DD HH:MM)
     last_static_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     created_at: Mapped[datetime] = _now()
 
@@ -159,6 +162,7 @@ class Voyage(Base):
     mmsi: Mapped[int] = mapped_column(Integer, index=True)
     origin_code: Mapped[str | None] = mapped_column(String(24))
     dest_code: Mapped[str | None] = mapped_column(String(24))
+    dest_raw: Mapped[str | None] = mapped_column(String(120))   # unresolved AIS destination text
     departure_ts: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     eta_ts: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     laden: Mapped[bool | None] = mapped_column(Boolean)

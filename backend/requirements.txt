@@ -8,3 +8,4 @@ httpx==0.28.1
 SQLAlchemy==2.0.52
 alembic==1.19.1
 psycopg[binary]==3.3.5
+websockets==13.1

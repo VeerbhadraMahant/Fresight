@@ -22,6 +22,7 @@ import { IdlePanel } from "./components/IdlePanel";
 import { RiskFeed } from "./components/RiskFeed";
 import { PlanView } from "./components/PlanView";
 import { BacktestView } from "./components/BacktestView";
+import { MapView } from "./components/MapView";
 import { ApiErrorCard } from "./components/ApiErrorCard";
 import { exportScenarioPdf } from "./lib/exportPdf";
 import { pct, usdCompact } from "./lib/format";
@@ -183,6 +184,9 @@ export default function App() {
         </div>
       )}
 
+      {view === "map" && <MapView />}
+
+      {view !== "map" && (
       <section className="band-canvas">
         <div className="shell py-12 md:py-14">
           <span className="eyebrow">FreightSight</span>
@@ -252,6 +256,7 @@ export default function App() {
           )}
         </div>
       </section>
+      )}
 
       {view === "scenario" && result && stats && (
         <>
@@ -327,15 +332,17 @@ export default function App() {
         </>
       )}
 
-      <footer className="band-canvas border-t border-mist">
-        <div className="shell py-8">
-          <p className="meta">
-            SIH 2026 prototype · real feeds (Breakwave dry-bulk index, Brent, IMF PortWatch,
-            Open-Meteo) blended with a voyage-economics + stochastic engine calibrated to published
-            2024–25 route rates &amp; real port constraints · not for operational chartering
-          </p>
-        </div>
-      </footer>
+      {view !== "map" && (
+        <footer className="band-canvas border-t border-mist">
+          <div className="shell py-8">
+            <p className="meta">
+              SIH 2026 prototype · real feeds (Breakwave dry-bulk index, Brent, IMF PortWatch,
+              Open-Meteo) blended with a voyage-economics + stochastic engine calibrated to published
+              2024–25 route rates &amp; real port constraints · not for operational chartering
+            </p>
+          </div>
+        </footer>
+      )}
     </div>
   );
 }

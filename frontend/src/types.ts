@@ -301,6 +301,86 @@ export interface PlanResponse {
   };
 }
 
+// ---- Phase 3: live map ---------------------------------------------------- //
+export interface MapPort {
+  code: string;
+  name: string;
+  lat: number;
+  lon: number;
+  basin: string | null;
+  country: string | null;
+  curated: boolean;
+}
+
+export interface MapPortsResponse {
+  enabled: boolean;
+  backend: string;
+  count: number;
+  ports: MapPort[];
+}
+
+export interface MapVessel {
+  mmsi: number;
+  name: string | null;
+  type: string | null;
+  lat: number;
+  lon: number;
+  sog_kn: number | null;
+  cog_deg: number | null;
+  heading_deg: number | null;
+  nav_status: string | null;
+  source: "ais" | "estimated";
+  ts: string | null;
+  destination: string | null;
+}
+
+export interface MapVesselsResponse {
+  enabled: boolean;
+  generated_at: string | null;
+  count?: number;
+  vessels: MapVessel[];
+}
+
+export interface MapVoyage {
+  status: string;
+  origin_code: string | null;
+  dest_code: string | null;
+  dest_raw: string | null;
+  departure_ts: string | null;
+  eta_ts: string | null;
+  confidence: number | null;
+}
+
+export interface MapVesselDetail {
+  enabled: boolean;
+  mmsi?: number;
+  vessel?: {
+    mmsi: number;
+    name: string | null;
+    imo: number | null;
+    type: string | null;
+    loa_m: number | null;
+    beam_m: number | null;
+    draft_m: number | null;
+    destination: string | null;
+    eta_raw: string | null;
+    nav_status: string | null;
+  };
+  track?: { lat: number; lon: number; ts: string | null; sog_kn: number | null; source: string }[];
+  latest?: { lat: number; lon: number; ts: string | null; sog_kn: number | null; source: string } | null;
+  voyage?: MapVoyage | null;
+}
+
+export interface MapSummary {
+  enabled: boolean;
+  ports: number;
+  vessels: number;
+  observed: number;
+  estimated: number;
+  active_voyages: number;
+  last_sample_at: string | null;
+}
+
 export interface MarketSnapshot {
   as_of: string;
   vlsfo_usd_t: number;

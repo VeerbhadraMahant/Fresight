@@ -18,7 +18,7 @@ export default defineConfig({
     chunkSizeWarningLimit: 900,
     rollupOptions: {
       output: {
-        manualChunks: { charts: ["recharts"] },
+        manualChunks: { charts: ["recharts"], map: ["leaflet", "react-leaflet"] },
       },
     },
   },

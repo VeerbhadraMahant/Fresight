@@ -1,5 +1,9 @@
 import type {
   DecisionBacktest,
+  MapPortsResponse,
+  MapSummary,
+  MapVesselDetail,
+  MapVesselsResponse,
   MarketSnapshot,
   PlanRequest,
   PlanResponse,
@@ -41,4 +45,12 @@ export const api = {
   decisionBacktest: (route_id: string, vessel: string, contract_months: number) =>
     get<DecisionBacktest>("/api/backtest/decisions", { route_id, vessel, contract_months }),
   plan: (req: PlanRequest) => post<PlanResponse>("/api/plan", req),
+
+  // Phase 3: live map
+  mapSummary: () => get<MapSummary>("/api/map/summary"),
+  mapPorts: (bbox?: string) =>
+    get<MapPortsResponse>("/api/map/ports", bbox ? { bbox, limit: 2500 } : { limit: 1800 }),
+  mapVessels: (bbox?: string) =>
+    get<MapVesselsResponse>("/api/map/vessels", bbox ? { bbox, limit: 1200 } : { limit: 1200 }),
+  mapVessel: (mmsi: number) => get<MapVesselDetail>(`/api/map/vessel/${mmsi}`),
 };

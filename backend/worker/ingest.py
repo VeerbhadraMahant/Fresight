@@ -9,10 +9,14 @@ Steps (each best-effort, each writes an ``ingest_runs`` row):
   3. append the latest modelled rate per lane x vessel to ``freight_rates``
      (history accrues -> the forecaster eventually trains on real observations);
   4. snapshot every active forecast to ``rate_forecasts`` (walk-forward skill);
-  5. upsert the risk scan into ``alerts`` with open/expired lifecycle.
+  5. upsert the risk scan into ``alerts`` with open/expired lifecycle;
+  6. sample AIS -> ``positions`` / ``vessels`` / ``voyages`` + dead-reckoning
+     (Phase 3; a no-op without ``AISSTREAM_API_KEY``).
 
 Env:
   FREIGHTSIGHT_LIVE_REFRESH_BUDGET   seconds for the live feed fetch (default 12; set ~120 in CI)
+  AISSTREAM_API_KEY                  AISStream.io key; unset -> the AIS step is skipped
+  AIS_SAMPLE_SECONDS                 AIS stream sampling window (default 150)
 """
 
 from __future__ import annotations
@@ -137,6 +141,25 @@ def _persist_forecasts(md) -> dict:
     return {"written": len(out), "run_ts": run_ts.isoformat()}
 
 
+def _ingest_ais() -> dict:
+    """Phase 3: sample AIS -> positions/vessels/voyages. Best-effort, isolated."""
+    from worker.live import run_live
+
+    t0 = datetime.now(UTC)
+    ok, err, summary = True, None, {}
+    try:
+        summary = run_live()
+    except Exception as exc:  # pragma: no cover - network dependent
+        ok, err = False, str(exc)[:400]
+        log.exception("AIS ingest failed")
+    with session_scope() as s:
+        s.add(IngestRun(
+            feed="ais", started_at=t0, finished_at=datetime.now(UTC), ok=ok,
+            rows=int(summary.get("ais_positions", 0)), detail=summary, error=err,
+        ))
+    return summary
+
+
 def _persist_alerts(md) -> dict:
     now = datetime.now(UTC)
     scan = scan_risks(md, max_alerts=60)
@@ -186,6 +209,7 @@ def run() -> dict:
         "freight_rates": _persist_rates(md, mode),
         "forecasts": _persist_forecasts(md),
         "alerts": _persist_alerts(md),
+        "ais": _ingest_ais(),
     }
 
     with session_scope() as s:

@@ -89,23 +89,26 @@ backend/  FastAPI + pandas + statsmodels
                          app runs from bundled CSV + committed snapshot when DATABASE_URL is unset)
     geo/                 global port registry + resolver, sea-route waypoint graph,
                          any-port-to-any-port voyage economics
+    live/                AIS (AISStream.io) parser + sampler · spherical dead-reckoning
     data/ports_global.csv   ~130 major world ports (merged with the 18 curated ports)
     routers/             /api/reference/*  ·  /api/{forecast,vessel,timing,risk,idle,
                          backtest/decisions,plan,scenario}  ·  /api/reference/ports/search,
                          /api/reference/port  ·  /api/geo/{route,lane}  ·
-                         /api/system/{health,ingest-runs}  ·  /api/internal/refresh
+                         /api/system/{health,ingest-runs}  ·  /api/internal/refresh  ·
+                         /api/map/{summary,vessels,vessel/{mmsi},ports}
   worker/ingest.py       self-updating pipeline — fetch feeds → feed_snapshots →
                          freight_rates / rate_forecasts / alerts history (runs in GitHub Actions */15)
-  alembic/               migrations 0001 (core + geo) · 0002 (Phase 2 history)
-  tests/                 test_smoke.py (19) + test_geo.py (22) + test_worker.py (6)
+  worker/live.py         AIS sample → positions / vessels / voyages + dead-reckoning (Phase 3)
+  alembic/               migrations 0001 (core + geo) · 0002 (Phase 2 history) · 0003 (live cols)
+  tests/                 test_smoke.py (19) + test_geo.py (22) + test_worker.py (7) + test_live.py (15)
   scripts/  build_real_snapshot.py · load_ports.py (seed) · import_wpi.py · start.sh (container entrypoint)
   .github/workflows/  ci.yml · ingest.yml (*/15) · keepwarm.yml (*/10)
   Dockerfile · pyproject.toml (ruff) · pytest.ini · alembic.ini · requirements*.txt · .env.example
 
-frontend/  Vite + React + TypeScript + Tailwind + Recharts  ("Ventriloc" editorial theme)
+frontend/  Vite + React + TypeScript + Tailwind + Recharts + Leaflet  ("Ventriloc" editorial theme)
   src/components/  TopBar (view nav), ScenarioPanel, StatStrip, ForecastPanel/ForecastChart,
                    VesselPanel, TimingPanel, CoverTimingPanel, IdlePanel, RiskFeed,
-                   PlanView, BacktestView, ErrorBoundary
+                   PlanView, BacktestView, MapView (react-leaflet live map), ErrorBoundary
   src/App.tsx      view router + data flow      src/lib/  theme + formatters
   Dockerfile · default.conf.template (nginx) · eslint.config.js · .env.example
 ```
@@ -160,6 +163,9 @@ Start the backend first. No internet required — the committed snapshot carries
 | `FREIGHTSIGHT_LOG_LEVEL` | backend | `INFO` | log verbosity |
 | `FREIGHTSIGHT_SKIP_LIVE_PROBE` | backend | `0` (`1` in Docker) | keep snapshot, skip live refresh |
 | `FREIGHTSIGHT_DISABLE_REALDATA` | backend | `0` | pure-synthetic (no snapshot) |
+| `DATABASE_URL` | backend + worker | _(unset)_ | Postgres/Supabase DSN; unset → bundled CSV + snapshot (Phase 1–3) |
+| `AISSTREAM_API_KEY` | worker | _(unset)_ | AISStream.io key; unset → live-map AIS step is a no-op |
+| `AIS_SAMPLE_SECONDS` | worker | `150` | AIS stream sampling window per ingest run |
 | `VITE_API_BASE` | frontend (build) | `""` (same-origin `/api`) | absolute API URL if cross-origin |
 
 ---

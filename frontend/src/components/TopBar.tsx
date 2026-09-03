@@ -5,6 +5,7 @@ const VIEWS = [
   ["scenario", "Scenario"],
   ["plan", "Procurement plan"],
   ["backtest", "Cover-timing test"],
+  ["map", "Live map"],
 ] as const;
 
 export type View = (typeof VIEWS)[number][0];

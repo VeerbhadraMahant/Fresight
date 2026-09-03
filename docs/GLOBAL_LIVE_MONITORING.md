@@ -52,8 +52,26 @@ cron-job.org (*/10)  ──►  GET /api/system/health   (keep-warm)          Li
   - `/api/system/health` reports per-feed freshness + `stale` flags + history counts;
     `/api/system/ingest-runs`; token-guarded `POST /api/internal/refresh`.
   - 6 new tests (subprocess-driven, real DB path); ruff + full suite green.
-- [ ] **Phase 3 — Live map** — AIS sampling + dead-reckoning, `positions` / `voyages`,
-      react-leaflet map view, vessel/port interactions.
+- [x] **Phase 3 — Live map**
+  - `app/live/ais.py` — AISStream.io adapter: a pure `parse_message()` + a best-effort
+    WebSocket `sample()` that collects the latest position/static frame per MMSI over a
+    ~3-min window. No `AISSTREAM_API_KEY` → `sample()` is a no-op.
+  - `app/live/reckon.py` — spherical dead-reckoning + nearest-port lookup (pure).
+  - `worker/live.py` (`run_live()`, called from `worker/ingest.py`, best-effort) —
+    upsert `vessels` from static frames → append de-duplicated observed `positions`
+    (`source='ais'`) → re-project each vessel forward from its last fix into one rolling
+    `source='estimated'` point → infer coarse `voyages` from berth↔sea transitions.
+    Writes an `ingest_runs` row (`feed='ais'`).
+  - `alembic/` migration `0003` — `vessels.nav_status/destination/eta_raw`, `voyages.dest_raw`
+    (idempotent `add_column`; a fresh DB gets them from the models).
+  - `routers/map.py` — `GET /api/map/{summary,vessels,vessel/{mmsi},ports}`. **Ports + sea
+    lanes render with no database**; vessel layers populate once `DATABASE_URL` is set and
+    the worker has run (`{"enabled": false}` until then).
+  - Frontend: `components/MapView.tsx` (react-leaflet, OSM tiles) — a **Live map** view with
+    port markers, AIS/dead-reckoned vessel chevrons, per-vessel track + inferred-voyage panel,
+    45 s viewport polling. `leaflet` + `react-leaflet` added (lazy `map` chunk, ~45 KB gz).
+  - `.github/workflows/ingest.yml` gains `AISSTREAM_API_KEY` / `AIS_SAMPLE_SECONDS`.
+  - 15 new tests (`test_live.py`, pure + no-DB endpoints) + 1 in `test_worker.py`; ruff + suite green.
 - [ ] **Phase 4 — Polish** — system-status UI, provenance everywhere, deploy docs, tests.
 
 ## Notes / known limitations (Phase 1)
@@ -85,3 +103,19 @@ backend connects as table owner and bypasses RLS; the public anon API cannot rea
 
 Verify: `GET /api/system/health` → `self_updating: true`, `feeds.ingest.stale: false`,
 `history.freight_rate_points > 0`.
+
+### Phase 3 activation (live vessels)
+
+The **Live map** view already shows world ports + sea lanes with no configuration. To
+light up vessel traffic:
+
+1. Add a free **AISStream.io** key as GitHub Actions secret `AISSTREAM_API_KEY`
+   (`https://aisstream.io` → sign up → API key).
+2. `DATABASE_URL` must already be set (Phase 2). The next `ingest` run then samples AIS
+   for ~3 min, writes `positions` / `vessels` / `voyages`, and `feed='ais'` appears in
+   `ingest_runs`.
+3. Verify: `GET /api/map/summary` → `enabled: true`, `vessels > 0`, `last_sample_at` recent.
+
+Notes: AIS is *sampled* per run, not streamed continuously — between runs, `source='estimated'`
+points are dead-reckoned from the last course/speed. Voyage inference is coarse (berth-proximity
++ AIS destination text); it is a monitoring aid, not authoritative.
