@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, HTTPException, Query
 
 from .. import reference_data as ref
 from ..decision_backtest import decision_backtest as run_decision_backtest
@@ -66,7 +66,11 @@ def idle(route_id: str, vessel: str):
 
 
 @router.get("/backtest/decisions")
-def backtest_decisions(route_id: str, vessel: str, contract_months: int = 3):
+def backtest_decisions(
+    route_id: str,
+    vessel: str,
+    contract_months: int = Query(3, ge=1, le=24),
+):
     m = STORE.require()
     try:
         return run_decision_backtest(m, route_id, vessel, contract_months=contract_months)
@@ -116,7 +120,8 @@ def scenario(req: ScenarioRequest):
             _db = run_decision_backtest(m, route_id, vessel,
                                         contract_months=req.contract_duration_months)
             dbt = {"strategies": _db["strategies"], "summary": _db["summary"],
-                   "decision_points": _db["decision_points"]}
+                   "decision_points": _db["decision_points"],
+                   "limited_history": _db["limited_history"], "note": _db["note"]}
         except ValueError:
             dbt = None
     risks = scan_risks(m, max_alerts=40)

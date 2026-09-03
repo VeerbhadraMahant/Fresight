@@ -198,6 +198,8 @@ export interface DecisionBacktest {
   vessel: string;
   contract_months: number;
   decision_points: number;
+  limited_history?: boolean;
+  note?: string | null;
   curve: {
     date: string;
     choice: "SPOT" | "PERIOD";
@@ -250,6 +252,8 @@ export interface ScenarioResponse {
     strategies: DecisionBacktest["strategies"];
     summary: DecisionBacktestSummary;
     decision_points: number;
+    limited_history?: boolean;
+    note?: string | null;
   } | null;
   weather: { expected_delay_days_16d: number; high_wind_days: number; heavy_rain_days: number } | null;
   risk_alerts: {

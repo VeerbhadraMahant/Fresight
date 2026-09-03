@@ -101,6 +101,13 @@ export function BacktestView({
             <span className="meta">{data.decision_points} decision points</span>
           </div>
 
+          {data.limited_history && (
+            <p className="caption mb-5 max-w-3xl text-graphite">
+              {data.note ??
+                "Few non-overlapping windows fit this cover length in the available history — treat the volatility figures as indicative."}
+            </p>
+          )}
+
           <div className="mb-3 flex gap-6">
             <Key color={C.graphite} label="Always spot" />
             <Key color={C.ember} label="Timed cover" dashed />

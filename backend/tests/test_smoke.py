@@ -174,6 +174,26 @@ def test_decision_backtest_endpoint(client):
     assert j["summary"]["period_vs_spot_volatility_pct"] >= -5
 
 
+def test_decision_backtest_long_contracts_do_not_400(client):
+    # a 12- or 18-month cover used to raise "series too short" -- the walk-forward
+    # window now widens/overlaps to keep >= 4 decision points
+    for months in (9, 12, 18):
+        j = client.get("/api/backtest/decisions", params={
+            "route_id": "AUHPT-INPRT", "vessel": "Capesize",
+            "contract_months": months}).json()
+        assert j["decision_points"] >= 4, (months, j)
+        assert len(j["curve"]) == j["decision_points"]
+        assert j["limited_history"] is True and j["note"]
+        # volatility deltas are clamped, never absurd
+        for key in ("timed_vs_spot_volatility_pct", "period_vs_spot_volatility_pct"):
+            assert -100.0 <= j["summary"][key] <= 100.0
+
+    # a contract longer than the usable history still fails cleanly (validated + 400)
+    assert client.get("/api/backtest/decisions", params={
+        "route_id": "AUHPT-INPRT", "vessel": "Capesize", "contract_months": 30}
+    ).status_code == 422  # ge/le on the query param
+
+
 def test_procurement_plan(client):
     j = client.post("/api/plan", json={"requirements": [
         {"origin": "AUHPT", "destination": "INPRT", "tonnes": 900_000},

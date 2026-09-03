@@ -27,6 +27,13 @@ export function CoverTimingPanel({ db, months }: { db: DB; months: number }) {
         in cost <span className="italic">volatility</span> — the move the problem statement calls for.
       </p>
 
+      {db.limited_history && (
+        <p className="caption mb-6 max-w-3xl text-graphite">
+          {db.note ??
+            "Few non-overlapping windows fit this cover length in the available history — treat the volatility figures as indicative."}
+        </p>
+      )}
+
       <div className="grid gap-5 sm:grid-cols-3">
         <Strat name="Always spot" tag="reactive today" stat={s.always_spot} maxVol={maxVol} />
         <Strat name="Always period" tag="standing COA cover" stat={s.always_period} maxVol={maxVol} highlight />
