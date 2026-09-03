@@ -85,11 +85,18 @@ backend/  FastAPI + pandas + statsmodels
     decision_backtest.py walk-forward cover-timing simulation (3 strategies)
     procurement_planner.py  multi-cargo contract-mix optimiser
     idle_risk.py         idle outlook + market-wide alert scan
-    routers/             /api/reference/*  and
-                         /api/{forecast,vessel,timing,risk,idle,backtest/decisions,plan,scenario}
-  tests/test_smoke.py    19 end-to-end API tests
-  scripts/build_real_snapshot.py   regenerate the committed snapshot
-  Dockerfile · pyproject.toml (ruff) · pytest.ini · requirements*.txt · .env.example
+    db/                  SQLAlchemy models + engine (optional Postgres / Supabase;
+                         app runs from bundled CSV when DATABASE_URL is unset)
+    geo/                 global port registry + resolver, sea-route waypoint graph,
+                         any-port-to-any-port voyage economics
+    data/ports_global.csv   ~130 major world ports (merged with the 18 curated ports)
+    routers/             /api/reference/*  ·  /api/{forecast,vessel,timing,risk,idle,
+                         backtest/decisions,plan,scenario}  ·  /api/reference/ports/search,
+                         /api/reference/port  ·  /api/geo/{route,lane}  ·  /api/system/health
+  alembic/               schema migrations (0001 initial)
+  tests/                 test_smoke.py (19) + test_geo.py (22) end-to-end API tests
+  scripts/  build_real_snapshot.py · load_ports.py (seed) · import_wpi.py (real NGA Pub 150)
+  Dockerfile · pyproject.toml (ruff) · pytest.ini · alembic.ini · requirements*.txt · .env.example
 
 frontend/  Vite + React + TypeScript + Tailwind + Recharts  ("Ventriloc" editorial theme)
   src/components/  TopBar (view nav), ScenarioPanel, StatStrip, ForecastPanel/ForecastChart,

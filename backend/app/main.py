@@ -22,7 +22,7 @@ from fastapi.middleware.cors import CORSMiddleware
 
 from . import __version__
 from .market_store import STORE
-from .routers import analysis, reference
+from .routers import analysis, geo, reference
 
 logging.basicConfig(
     level=os.getenv("FREIGHTSIGHT_LOG_LEVEL", "INFO").upper(),
@@ -63,6 +63,7 @@ app.add_middleware(
 
 app.include_router(reference.router)
 app.include_router(analysis.router)
+app.include_router(geo.router)
 
 
 @app.get("/api/health", tags=["meta"])

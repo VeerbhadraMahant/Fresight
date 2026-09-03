@@ -1,0 +1,187 @@
+code,unlocode,name,country,country_name,basin,water_body,lat,lon,max_draft_m,harbor_size,role,source
+NLRTM,NLRTM,Rotterdam,NL,Netherlands,NW_EUROPE,North Sea,51.95,4.14,22.5,Large,both,curated-v1
+NLAMS,NLAMS,Amsterdam,NL,Netherlands,NW_EUROPE,North Sea,52.40,4.85,15.5,Large,both,curated-v1
+BEANR,BEANR,Antwerp,BE,Belgium,NW_EUROPE,North Sea,51.26,4.32,16.0,Large,both,curated-v1
+DEHAM,DEHAM,Hamburg,DE,Germany,NW_EUROPE,North Sea,53.53,9.92,15.1,Large,both,curated-v1
+DEBRV,DEBRV,Bremerhaven,DE,Germany,NW_EUROPE,North Sea,53.55,8.57,14.5,Large,both,curated-v1
+DEWVN,DEWVN,Wilhelmshaven,DE,Germany,NW_EUROPE,North Sea,53.51,8.14,18.5,Medium,discharge,curated-v1
+GBIMM,GBIMM,Immingham,GB,United Kingdom,NW_EUROPE,North Sea,53.63,-0.19,14.5,Large,discharge,curated-v1
+GBTEE,GBMME,Teesport,GB,United Kingdom,NW_EUROPE,North Sea,54.60,-1.15,17.0,Medium,both,curated-v1
+FRDKK,FRDKK,Dunkirk,FR,France,NW_EUROPE,North Sea,51.03,2.20,20.5,Large,discharge,curated-v1
+GBPTM,GBPME,Portsmouth,GB,United Kingdom,NW_EUROPE,English Channel,50.80,-1.09,10.5,Medium,both,curated-v1
+ESGIJ,ESGIJ,Gijon,ES,Spain,ATLANTIC_IBERIA,Bay of Biscay,43.56,-5.70,23.0,Medium,discharge,curated-v1
+ESBIO,ESBIO,Bilbao,ES,Spain,ATLANTIC_IBERIA,Bay of Biscay,43.35,-3.05,21.0,Large,both,curated-v1
+PTSIE,PTSIN,Sines,PT,Portugal,ATLANTIC_IBERIA,North Atlantic Ocean,37.95,-8.87,17.0,Medium,both,curated-v1
+PLGDN,PLGDN,Gdansk,PL,Poland,BALTIC,Baltic Sea,54.40,18.70,15.0,Large,both,curated-v1
+LTKLJ,LTKLJ,Klaipeda,LT,Lithuania,BALTIC,Baltic Sea,55.70,21.12,14.5,Medium,both,curated-v1
+EEMUG,EEMUG,Muuga,EE,Estonia,BALTIC,Baltic Sea,59.50,24.95,18.0,Medium,load,curated-v1
+NONVK,NONVK,Narvik,NO,Norway,NW_EUROPE,Norwegian Sea,68.43,17.43,17.5,Medium,load,curated-v1
+RUMMK,RUMMK,Murmansk,RU,Russia,NW_EUROPE,Barents Sea,68.97,33.05,15.5,Large,load,curated-v1
+SELUL,SELLA,Lulea,SE,Sweden,BALTIC,Baltic Sea,65.58,22.16,12.0,Medium,load,curated-v1
+ITTRS,ITTRS,Trieste,IT,Italy,MEDITERRANEAN,Adriatic Sea,45.64,13.76,18.0,Large,both,curated-v1
+ITTAR,ITTAR,Taranto,IT,Italy,MEDITERRANEAN,Ionian Sea,40.47,17.22,16.5,Medium,discharge,curated-v1
+FRFOS,FRFOS,Fos-Marseille,FR,France,MEDITERRANEAN,Mediterranean Sea,43.42,4.87,20.0,Large,discharge,curated-v1
+ESCAR,ESCAR,Cartagena (ES),ES,Spain,MEDITERRANEAN,Mediterranean Sea,37.58,-0.98,18.0,Medium,both,curated-v1
+TRALI,TRALI,Aliaga,TR,Turkey,MEDITERRANEAN,Aegean Sea,38.80,26.97,17.0,Medium,discharge,curated-v1
+TRISK,TRISK,Iskenderun,TR,Turkey,MEDITERRANEAN,Mediterranean Sea,36.68,36.18,15.0,Medium,discharge,curated-v1
+EGEDK,EGEDK,El Dekheila,EG,Egypt,MEDITERRANEAN,Mediterranean Sea,31.15,29.82,14.5,Medium,discharge,curated-v1
+ROCND,ROCND,Constanta,RO,Romania,BLACK_SEA,Black Sea,44.15,28.65,19.0,Large,both,curated-v1
+UAPIV,UAPIV,Pivdennyi,UA,Ukraine,BLACK_SEA,Black Sea,46.62,31.02,18.5,Large,load,curated-v1
+RUNVS,RUNVS,Novorossiysk,RU,Russia,BLACK_SEA,Black Sea,44.72,37.79,15.5,Large,load,curated-v1
+SAJUB,SAJUB,Jubail,SA,Saudi Arabia,ARABIAN_GULF,Persian Gulf,27.00,49.66,17.0,Large,both,curated-v1
+SARAK,SARAK,Ras Al Khair,SA,Saudi Arabia,ARABIAN_GULF,Persian Gulf,27.52,49.20,16.0,Medium,both,curated-v1
+AEKLF,AEKLF,Khalifa,AE,United Arab Emirates,ARABIAN_GULF,Persian Gulf,24.81,54.65,18.0,Large,both,curated-v1
+OMSOH,OMSOH,Sohar,OM,Oman,ARABIAN_SEA,Gulf of Oman,24.51,56.63,18.0,Large,both,curated-v1
+OMSLL,OMSLL,Salalah,OM,Oman,ARABIAN_SEA,Arabian Sea,16.95,54.01,18.0,Large,both,curated-v1
+IQUQR,IQUQR,Umm Qasr,IQ,Iraq,ARABIAN_GULF,Persian Gulf,30.03,47.93,12.5,Medium,discharge,curated-v1
+IRBND,IRBND,Bandar Abbas,IR,Iran,ARABIAN_SEA,Strait of Hormuz,27.13,56.21,15.0,Large,both,curated-v1
+JOAQJ,JOAQB,Aqaba,JO,Jordan,RED_SEA,Red Sea,29.52,35.00,15.0,Medium,load,curated-v1
+SDPZU,SDPZU,Port Sudan,SD,Sudan,RED_SEA,Red Sea,19.62,37.22,12.0,Medium,both,curated-v1
+DJJIB,DJJIB,Djibouti,DJ,Djibouti,RED_SEA,Gulf of Aden,11.60,43.15,15.0,Medium,discharge,curated-v1
+INMUN,INMUN,Mundra,IN,India,ARABIAN_SEA,Arabian Sea,22.74,69.70,17.5,Large,discharge,curated-v1
+INIXY,INIXY,Kandla,IN,India,ARABIAN_SEA,Arabian Sea,23.03,70.22,14.5,Large,both,curated-v1
+INHZR,INHZR,Hazira,IN,India,ARABIAN_SEA,Arabian Sea,21.10,72.63,14.0,Medium,discharge,curated-v1
+INMRM,INMRM,Mormugao,IN,India,ARABIAN_SEA,Arabian Sea,15.40,73.80,14.0,Medium,load,curated-v1
+INNML,INNML,New Mangalore,IN,India,ARABIAN_SEA,Arabian Sea,12.94,74.80,15.5,Medium,both,curated-v1
+INTUT,INTUT,Tuticorin,IN,India,BAY_OF_BENGAL,Gulf of Mannar,8.75,78.20,14.0,Medium,both,curated-v1
+INENR,INENR,Ennore,IN,India,BAY_OF_BENGAL,Bay of Bengal,13.25,80.33,16.0,Medium,discharge,curated-v1
+INKRI,INKRI,Krishnapatnam,IN,India,BAY_OF_BENGAL,Bay of Bengal,14.25,80.12,18.5,Medium,discharge,curated-v1
+PKBQM,PKBQM,Port Qasim,PK,Pakistan,ARABIAN_SEA,Arabian Sea,24.77,67.34,14.0,Large,discharge,curated-v1
+PKKHI,PKKHI,Karachi,PK,Pakistan,ARABIAN_SEA,Arabian Sea,24.80,66.97,13.5,Large,both,curated-v1
+LKCMB,LKCMB,Colombo,LK,Sri Lanka,ARABIAN_SEA,Indian Ocean,6.95,79.84,18.0,Large,both,curated-v1
+BDCGP,BDCGP,Chittagong,BD,Bangladesh,BAY_OF_BENGAL,Bay of Bengal,22.28,91.80,9.5,Large,discharge,curated-v1
+SGSIN,SGSIN,Singapore,SG,Singapore,SE_ASIA,Singapore Strait,1.26,103.83,20.0,Large,both,curated-v1
+MYPKG,MYPKG,Port Klang,MY,Malaysia,SE_ASIA,Strait of Malacca,3.00,101.39,17.0,Large,both,curated-v1
+VNCMP,VNCMP,Cam Pha,VN,Vietnam,SE_ASIA,Gulf of Tonkin,21.02,107.35,12.0,Medium,load,curated-v1
+VNSDA,VNSDA,Son Duong,VN,Vietnam,SE_ASIA,South China Sea,18.10,106.42,21.0,Medium,discharge,curated-v1
+VNVUT,VNVUT,Cai Mep-Vung Tau,VN,Vietnam,SE_ASIA,South China Sea,10.52,107.02,15.5,Large,both,curated-v1
+THLCH,THLCH,Laem Chabang,TH,Thailand,SE_ASIA,Gulf of Thailand,13.08,100.88,16.0,Large,both,curated-v1
+THSRC,THSRI,Koh Sichang,TH,Thailand,SE_ASIA,Gulf of Thailand,13.15,100.82,14.0,Medium,both,curated-v1
+IDMRW,IDMRW,Morowali,ID,Indonesia,SE_ASIA,Banda Sea,-2.83,122.10,12.0,Medium,load,curated-v1
+PHSFS,PHSFS,Subic Bay,PH,Philippines,SE_ASIA,South China Sea,14.80,120.27,13.0,Medium,both,curated-v1
+CNSHG,CNSHA,Shanghai,CN,China,CHINA_SOUTH,East China Sea,31.34,121.65,17.5,Large,both,curated-v1
+CNNGB,CNNGB,Ningbo-Zhoushan,CN,China,CHINA_SOUTH,East China Sea,29.87,122.05,25.0,Large,both,curated-v1
+CNTAO,CNTAO,Qingdao,CN,China,CHINA_NORTH,Yellow Sea,36.08,120.32,20.0,Large,discharge,curated-v1
+CNRZH,CNRZH,Rizhao,CN,China,CHINA_NORTH,Yellow Sea,35.38,119.55,21.0,Large,both,curated-v1
+CNTXG,CNTXG,Tianjin,CN,China,CHINA_NORTH,Bohai Sea,38.98,117.78,19.5,Large,both,curated-v1
+CNDLC,CNDLC,Dalian,CN,China,CHINA_NORTH,Bohai Sea,38.95,121.90,18.0,Large,both,curated-v1
+CNCFD,CNCFD,Caofeidian,CN,China,CHINA_NORTH,Bohai Sea,38.95,118.50,25.0,Large,both,curated-v1
+CNQHD,CNQHD,Qinhuangdao,CN,China,CHINA_NORTH,Bohai Sea,39.92,119.62,18.5,Large,load,curated-v1
+CNHUA,CNHUA,Huanghua,CN,China,CHINA_NORTH,Bohai Sea,38.35,117.85,18.0,Large,load,curated-v1
+CNLYG,CNLYG,Lianyungang,CN,China,CHINA_SOUTH,Yellow Sea,34.75,119.45,16.0,Large,both,curated-v1
+CNZJG,CNZJG,Zhangjiagang,CN,China,CHINA_SOUTH,Yangtze River,31.98,120.42,12.5,Large,both,curated-v1
+CNGZG,CNNSA,Guangzhou Nansha,CN,China,CHINA_SOUTH,Pearl River,22.68,113.62,17.0,Large,both,curated-v1
+CNZHA,CNZHA,Zhanjiang,CN,China,CHINA_SOUTH,South China Sea,21.15,110.42,22.0,Large,discharge,curated-v1
+CNFAN,CNFNG,Fangcheng,CN,China,CHINA_SOUTH,Gulf of Tonkin,21.60,108.35,15.0,Medium,both,curated-v1
+CNYIK,CNYIK,Yingkou,CN,China,CHINA_NORTH,Bohai Sea,40.28,122.10,15.0,Large,both,curated-v1
+HKHKG,HKHKG,Hong Kong,HK,Hong Kong,CHINA_SOUTH,South China Sea,22.30,114.18,15.5,Large,both,curated-v1
+JPCHB,JPCHB,Chiba,JP,Japan,JAPAN,Tokyo Bay,35.57,140.06,18.0,Large,discharge,curated-v1
+JPKWS,JPKWS,Kawasaki,JP,Japan,JAPAN,Tokyo Bay,35.50,139.75,17.0,Large,discharge,curated-v1
+JPYOK,JPYOK,Yokohama,JP,Japan,JAPAN,Tokyo Bay,35.45,139.65,18.0,Large,both,curated-v1
+JPNGO,JPNGO,Nagoya,JP,Japan,JAPAN,Ise Bay,35.05,136.85,16.0,Large,both,curated-v1
+JPFKY,JPFKY,Fukuyama,JP,Japan,JAPAN,Seto Inland Sea,34.45,133.38,18.0,Medium,discharge,curated-v1
+JPOIT,JPOIT,Oita,JP,Japan,JAPAN,Seto Inland Sea,33.25,131.70,18.0,Medium,discharge,curated-v1
+JPKSM,JPKShima,Kashima,JP,Japan,JAPAN,North Pacific Ocean,35.90,140.70,19.0,Medium,discharge,curated-v1
+JPMOJ,JPMOJ,Kitakyushu,JP,Japan,JAPAN,Kanmon Strait,33.90,130.90,15.0,Large,both,curated-v1
+JPMUR,JPMUR,Muroran,JP,Japan,JAPAN,North Pacific Ocean,42.35,140.95,17.0,Medium,discharge,curated-v1
+KRPUS,KRPUS,Busan,KR,South Korea,JAPAN,Korea Strait,35.10,129.05,17.0,Large,both,curated-v1
+KRKAN,KRKAN,Gwangyang,KR,South Korea,JAPAN,Korea Strait,34.90,127.70,21.0,Large,discharge,curated-v1
+KRINC,KRINC,Incheon,KR,South Korea,CHINA_NORTH,Yellow Sea,37.45,126.60,14.0,Large,both,curated-v1
+KRPTK,KRPTK,Pyeongtaek,KR,South Korea,CHINA_NORTH,Yellow Sea,36.97,126.82,14.0,Large,both,curated-v1
+KRPHG,KRKPO,Pohang,KR,South Korea,JAPAN,Sea of Japan,36.02,129.40,18.0,Medium,discharge,curated-v1
+TWKHH,TWKHH,Kaohsiung,TW,Taiwan,CHINA_SOUTH,Taiwan Strait,22.60,120.28,16.0,Large,both,curated-v1
+TWTXG,TWTXG,Taichung,TW,Taiwan,CHINA_SOUTH,Taiwan Strait,24.30,120.50,16.0,Large,discharge,curated-v1
+AUPHE,AUPHE,Port Hedland,AU,Australia,AUS_WEST,Indian Ocean,-20.31,118.58,19.5,Large,load,curated-v1
+AUDAM,AUDAM,Dampier,AU,Australia,AUS_WEST,Indian Ocean,-20.66,116.71,19.0,Large,load,curated-v1
+AUWAL,AUCLB,Cape Lambert,AU,Australia,AUS_WEST,Indian Ocean,-20.60,117.18,19.0,Medium,load,curated-v1
+AUGET,AUGET,Geraldton,AU,Australia,AUS_WEST,Indian Ocean,-28.77,114.58,12.5,Medium,load,curated-v1
+AUESP,AUEPR,Esperance,AU,Australia,AUS_WEST,Southern Ocean,-33.87,121.90,19.0,Medium,load,curated-v1
+AUFRE,AUFRE,Fremantle,AU,Australia,AUS_WEST,Indian Ocean,-32.05,115.74,14.0,Large,both,curated-v1
+AUGLA,AUGLT,Gladstone,AU,Australia,AUS_EAST,Coral Sea,-23.83,151.25,19.0,Large,load,curated-v1
+AUABP,AUABP,Abbot Point,AU,Australia,AUS_EAST,Coral Sea,-19.88,148.08,19.0,Medium,load,curated-v1
+AUPKL,AUPKL,Port Kembla,AU,Australia,AUS_EAST,Tasman Sea,-34.47,150.90,16.0,Large,both,curated-v1
+AUBNE,AUBNE,Brisbane,AU,Australia,AUS_EAST,Coral Sea,-27.38,153.17,14.0,Large,both,curated-v1
+AUTSV,AUTSV,Townsville,AU,Australia,AUS_EAST,Coral Sea,-19.25,146.83,12.5,Medium,both,curated-v1
+AUADL,AUADL,Port Adelaide,AU,Australia,AUS_EAST,Southern Ocean,-34.78,138.48,12.5,Large,both,curated-v1
+AUWYA,AUWYA,Whyalla,AU,Australia,AUS_EAST,Spencer Gulf,-33.03,137.58,12.0,Medium,load,curated-v1
+NZTRG,NZTRG,Tauranga,NZ,New Zealand,NZ,South Pacific Ocean,-37.64,176.18,14.5,Large,both,curated-v1
+NZLYT,NZLYT,Lyttelton,NZ,New Zealand,NZ,South Pacific Ocean,-43.60,172.72,12.5,Medium,both,curated-v1
+NCNOU,NCNOU,Noumea,NC,New Caledonia,SE_ASIA,Coral Sea,-22.27,166.44,11.0,Medium,load,curated-v1
+ZARCB,ZARCB,Richards Bay,ZA,South Africa,SOUTH_AFRICA,Indian Ocean,-28.80,32.08,17.5,Large,load,curated-v1
+ZASDB,ZASBK,Saldanha Bay,ZA,South Africa,SOUTH_AFRICA,South Atlantic Ocean,-33.02,17.95,21.5,Large,load,curated-v1
+ZADUR,ZADUR,Durban,ZA,South Africa,SOUTH_AFRICA,Indian Ocean,-29.87,31.03,12.8,Large,both,curated-v1
+ZANGQ,ZANGQ,Ngqura,ZA,South Africa,SOUTH_AFRICA,Indian Ocean,-33.81,25.68,18.0,Medium,both,curated-v1
+ZACPT,ZACPT,Cape Town,ZA,South Africa,SOUTH_AFRICA,South Atlantic Ocean,-33.90,18.43,15.5,Large,both,curated-v1
+MZNAC,MZNAC,Nacala,MZ,Mozambique,EAST_AFRICA,Indian Ocean,-14.54,40.67,18.0,Medium,load,curated-v1
+TZDAR,TZDAR,Dar es Salaam,TZ,Tanzania,EAST_AFRICA,Indian Ocean,-6.83,39.30,13.0,Large,both,curated-v1
+KEMBA,KEMBA,Mombasa,KE,Kenya,EAST_AFRICA,Indian Ocean,-4.06,39.65,15.0,Large,both,curated-v1
+MGTMM,MGTMM,Toamasina,MG,Madagascar,EAST_AFRICA,Indian Ocean,-18.15,49.42,13.5,Medium,both,curated-v1
+NAWVB,NAWVB,Walvis Bay,NA,Namibia,SOUTH_AFRICA,South Atlantic Ocean,-22.95,14.50,14.5,Medium,both,curated-v1
+AOLOB,AOLOB,Lobito,AO,Angola,WEST_AFRICA,South Atlantic Ocean,-12.35,13.55,15.0,Medium,load,curated-v1
+CGPNR,CGPNR,Pointe-Noire,CG,Congo,WEST_AFRICA,South Atlantic Ocean,-4.79,11.83,15.0,Medium,both,curated-v1
+GALBV,GAOWE,Owendo-Libreville,GA,Gabon,WEST_AFRICA,Gulf of Guinea,0.30,9.50,13.0,Medium,load,curated-v1
+CMKBI,CMKBI,Kribi,CM,Cameroon,WEST_AFRICA,Gulf of Guinea,2.94,9.91,16.0,Medium,both,curated-v1
+NGLOS,NGLOS,Lagos,NG,Nigeria,WEST_AFRICA,Gulf of Guinea,6.44,3.37,13.5,Large,both,curated-v1
+GHTKD,GHTKD,Takoradi,GH,Ghana,WEST_AFRICA,Gulf of Guinea,4.88,-1.75,16.0,Medium,load,curated-v1
+CIABJ,CIABJ,Abidjan,CI,Ivory Coast,WEST_AFRICA,Gulf of Guinea,5.28,-4.01,15.0,Large,both,curated-v1
+SNDKR,SNDKR,Dakar,SN,Senegal,WEST_AFRICA,North Atlantic Ocean,14.68,-17.42,13.0,Large,both,curated-v1
+MRNDB,MRNDB,Nouadhibou,MR,Mauritania,WEST_AFRICA,North Atlantic Ocean,20.90,-17.03,17.0,Medium,load,curated-v1
+GNKMR,GNKMR,Kamsar,GN,Guinea,WEST_AFRICA,North Atlantic Ocean,10.68,-14.60,13.0,Medium,load,curated-v1
+GNCKY,GNCKY,Conakry,GN,Guinea,WEST_AFRICA,North Atlantic Ocean,9.51,-13.71,13.5,Medium,load,curated-v1
+LRUCN,LRUCN,Buchanan,LR,Liberia,WEST_AFRICA,North Atlantic Ocean,5.88,-10.05,17.0,Medium,load,curated-v1
+TGLFW,TGLFW,Lome,TG,Togo,WEST_AFRICA,Gulf of Guinea,6.13,1.28,16.0,Large,both,curated-v1
+USMOB,USMOB,Mobile,US,United States,US_GULF,Gulf of Mexico,30.70,-88.04,13.7,Large,both,curated-v1
+USMSY,USMSY,New Orleans,US,United States,US_GULF,Gulf of Mexico,29.95,-90.07,13.7,Large,load,curated-v1
+USBTR,USBTR,Baton Rouge,US,United States,US_GULF,Gulf of Mexico,30.45,-91.19,13.7,Large,load,curated-v1
+USCRP,USCRP,Corpus Christi,US,United States,US_GULF,Gulf of Mexico,27.81,-97.40,16.7,Large,both,curated-v1
+USHOU,USHOU,Houston,US,United States,US_GULF,Gulf of Mexico,29.73,-95.27,13.7,Large,both,curated-v1
+USTPA,USTPA,Tampa,US,United States,US_GULF,Gulf of Mexico,27.92,-82.45,13.0,Large,load,curated-v1
+USNYC,USNYC,New York,US,United States,US_EAST,North Atlantic Ocean,40.67,-74.05,15.2,Large,both,curated-v1
+USSAV,USSAV,Savannah,US,United States,US_EAST,North Atlantic Ocean,32.08,-81.10,14.3,Large,both,curated-v1
+USCHS,USCHS,Charleston,US,United States,US_EAST,North Atlantic Ocean,32.78,-79.92,14.3,Large,both,curated-v1
+USJAX,USJAX,Jacksonville,US,United States,US_EAST,North Atlantic Ocean,30.40,-81.55,12.2,Large,both,curated-v1
+USDUL,USDLH,Duluth-Superior,US,United States,GREAT_LAKES,Lake Superior,46.75,-92.10,8.2,Large,load,curated-v1
+USTOL,USTOL,Toledo,US,United States,GREAT_LAKES,Lake Erie,41.68,-83.47,8.2,Medium,both,curated-v1
+USCLE,USCLE,Cleveland,US,United States,GREAT_LAKES,Lake Erie,41.51,-81.70,8.2,Medium,discharge,curated-v1
+USLAX,USLAX,Los Angeles-Long Beach,US,United States,US_WEST,North Pacific Ocean,33.74,-118.24,22.0,Large,both,curated-v1
+USPDX,USPDX,Portland (OR),US,United States,US_NW,North Pacific Ocean,45.55,-122.70,12.2,Large,load,curated-v1
+USKLM,USKLM,Kalama,US,United States,US_NW,North Pacific Ocean,46.01,-122.86,12.2,Medium,load,curated-v1
+USSEA,USSEA,Seattle-Tacoma,US,United States,US_NW,North Pacific Ocean,47.27,-122.41,15.0,Large,both,curated-v1
+USSTO,USSCK,Stockton,US,United States,US_WEST,North Pacific Ocean,37.95,-121.33,10.7,Medium,both,curated-v1
+CASEP,CASEP,Sept-Iles,CA,Canada,CANADA_EAST,Gulf of St Lawrence,50.20,-66.38,23.0,Large,load,curated-v1
+CAPCA,CAPCA,Port-Cartier,CA,Canada,CANADA_EAST,Gulf of St Lawrence,50.03,-66.87,22.0,Medium,load,curated-v1
+CAQUE,CAQUE,Quebec City,CA,Canada,CANADA_EAST,St Lawrence River,46.83,-71.20,15.0,Large,both,curated-v1
+CAHAM,CAHAM,Hamilton (ON),CA,Canada,GREAT_LAKES,Lake Ontario,43.28,-79.85,8.2,Medium,discharge,curated-v1
+CATHU,CATHU,Thunder Bay,CA,Canada,GREAT_LAKES,Lake Superior,48.42,-89.22,10.7,Medium,load,curated-v1
+CAVAN,CAVAN,Vancouver,CA,Canada,CANADA_WEST,North Pacific Ocean,49.29,-123.10,18.0,Large,load,curated-v1
+CAPRR,CAPRR,Prince Rupert,CA,Canada,CANADA_WEST,North Pacific Ocean,54.24,-130.32,22.0,Medium,load,curated-v1
+MXZLO,MXLZC,Lazaro Cardenas,MX,Mexico,LATAM_WEST,North Pacific Ocean,17.96,-102.18,18.0,Large,both,curated-v1
+MXATM,MXATM,Altamira,MX,Mexico,US_GULF,Gulf of Mexico,22.50,-97.87,12.5,Large,both,curated-v1
+BRPTM,BRMDR,Ponta da Madeira,BR,Brazil,BRAZIL_NORTH,South Atlantic Ocean,-2.57,-44.37,23.0,Large,load,curated-v1
+BRIQI,BRITQ,Itaqui,BR,Brazil,BRAZIL_NORTH,South Atlantic Ocean,-2.58,-44.37,19.0,Large,both,curated-v1
+BRPEC,BRPEC,Pecem,BR,Brazil,BRAZIL_NORTH,South Atlantic Ocean,-3.55,-38.80,20.0,Medium,both,curated-v1
+BRTUB,BRVIX,Tubarao,BR,Brazil,BRAZIL_SOUTH,South Atlantic Ocean,-20.28,-40.24,21.0,Large,load,curated-v1
+BRACU,BRACU,Acu,BR,Brazil,BRAZIL_SOUTH,South Atlantic Ocean,-21.83,-41.00,25.0,Large,load,curated-v1
+BRSPB,BRSP1,Sepetiba-Itaguai,BR,Brazil,BRAZIL_SOUTH,South Atlantic Ocean,-22.93,-43.83,20.0,Large,load,curated-v1
+BRSSZ,BRSSZ,Santos,BR,Brazil,BRAZIL_SOUTH,South Atlantic Ocean,-23.98,-46.30,15.0,Large,both,curated-v1
+BRPNG,BRPNG,Paranagua,BR,Brazil,BRAZIL_SOUTH,South Atlantic Ocean,-25.50,-48.52,13.5,Large,load,curated-v1
+BRRIG,BRRIG,Rio Grande,BR,Brazil,BRAZIL_SOUTH,South Atlantic Ocean,-32.10,-52.10,14.0,Large,load,curated-v1
+UYMVD,UYMVD,Montevideo,UY,Uruguay,RIVER_PLATE,South Atlantic Ocean,-34.90,-56.21,12.0,Large,both,curated-v1
+ARBUE,ARBUE,Buenos Aires,AR,Argentina,RIVER_PLATE,Rio de la Plata,-34.60,-58.37,10.0,Large,both,curated-v1
+ARROS,ARROS,Rosario,AR,Argentina,RIVER_PLATE,Parana River,-32.85,-60.72,10.4,Large,load,curated-v1
+ARBHI,ARBHI,Bahia Blanca,AR,Argentina,RIVER_PLATE,South Atlantic Ocean,-38.78,-62.25,13.4,Large,load,curated-v1
+ARNEC,ARQQN,Quequen,AR,Argentina,RIVER_PLATE,South Atlantic Ocean,-38.58,-58.70,13.7,Medium,load,curated-v1
+CLMEJ,CLMJS,Mejillones,CL,Chile,LATAM_WEST,South Pacific Ocean,-23.10,-70.45,18.0,Medium,both,curated-v1
+CLHUA,CLHSO,Huasco,CL,Chile,LATAM_WEST,South Pacific Ocean,-28.47,-71.22,17.0,Medium,load,curated-v1
+CLSAI,CLSAI,San Antonio,CL,Chile,LATAM_WEST,South Pacific Ocean,-33.59,-71.62,15.0,Large,both,curated-v1
+CLCNL,CLCNL,Coronel,CL,Chile,LATAM_WEST,South Pacific Ocean,-37.03,-73.15,15.0,Medium,both,curated-v1
+PECLL,PECLL,Callao,PE,Peru,LATAM_WEST,South Pacific Ocean,-12.05,-77.15,14.0,Large,both,curated-v1
+PEMRI,PEMRI,Matarani,PE,Peru,LATAM_WEST,South Pacific Ocean,-17.00,-72.10,14.5,Medium,load,curated-v1
+ECGYE,ECGYE,Guayaquil,EC,Ecuador,LATAM_WEST,South Pacific Ocean,-2.28,-79.90,12.5,Large,both,curated-v1
+COBUN,COBUN,Buenaventura,CO,Colombia,LATAM_WEST,North Pacific Ocean,3.88,-77.07,13.5,Large,both,curated-v1
+COSMR,COSMR,Santa Marta,CO,Colombia,CARIBBEAN,Caribbean Sea,11.25,-74.22,18.0,Medium,load,curated-v1
+COPBO,COPBO,Puerto Bolivar,CO,Colombia,CARIBBEAN,Caribbean Sea,12.24,-71.98,19.0,Medium,load,curated-v1
+COCTG,COCTG,Cartagena (CO),CO,Colombia,CARIBBEAN,Caribbean Sea,10.40,-75.53,16.5,Large,both,curated-v1
+VEPBL,VEPBL,Puerto Ordaz,VE,Venezuela,CARIBBEAN,Orinoco River,8.29,-62.72,11.0,Medium,load,curated-v1
+JMPGE,JMPGE,Port Esquivel,JM,Jamaica,CARIBBEAN,Caribbean Sea,17.88,-77.13,12.0,Medium,load,curated-v1
+TTPTS,TTPTS,Point Lisas,TT,Trinidad and Tobago,CARIBBEAN,Caribbean Sea,10.38,-61.48,12.0,Medium,both,curated-v1

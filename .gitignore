@@ -24,6 +24,13 @@ Thumbs.db
 # Runtime
 *.log
 backend/.cache/
+*.db
+*.sqlite
+*.sqlite3
+backend/_*.db
 
-/docs
+# Local scratch docs (PPT / research) stay out of the repo, but keep the
+# architecture + roadmap doc tracked.
+/docs/*
+!/docs/GLOBAL_LIVE_MONITORING.md
 /deployment.md
