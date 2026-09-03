@@ -5,6 +5,10 @@ __pycache__/
 .pytest_cache/
 .ruff_cache/
 tests/
-scripts/
 *.md
 .env
+*.db
+*.sqlite*
+# dev-only scripts (the runtime ones -- start.sh, load_ports.py, import_wpi.py -- must ship)
+scripts/build_real_snapshot.py
+scripts/capture_demo_fixture.py

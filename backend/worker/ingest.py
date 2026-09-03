@@ -168,7 +168,10 @@ def _persist_alerts(md) -> dict:
 # --------------------------------------------------------------------------- #
 def run() -> dict:
     if not DB_ENABLED:
-        raise SystemExit("DATABASE_URL is not set -- the ingest worker needs a database.")
+        # No database configured yet -> nothing to persist. Exit 0 so the
+        # scheduled workflow isn't a permanent red X before DATABASE_URL is set.
+        log.warning("DATABASE_URL is not set -- skipping ingest (no database to write to).")
+        return {"skipped": "DATABASE_URL not set"}
 
     started = datetime.now(UTC)
     log.info("ingest starting")

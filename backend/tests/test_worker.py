@@ -114,3 +114,11 @@ def test_ingest_runs_endpoint_without_db(client):
 
 def test_internal_refresh_disabled_without_token(client):
     assert client.post("/api/internal/refresh").status_code == 503
+
+
+def test_worker_skips_gracefully_without_database_url():
+    env = {k: v for k, v in os.environ.items() if k != "DATABASE_URL"}
+    env["FREIGHTSIGHT_SKIP_LIVE_PROBE"] = "1"
+    r = _run(["-m", "worker.ingest"], env)
+    assert r.returncode == 0, r.stderr
+    assert "skipping ingest" in (r.stderr + r.stdout).lower()
