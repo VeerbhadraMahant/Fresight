@@ -1,29 +1,32 @@
-# FreightSight — Freight Forecasting & Vessel-Chartering Decision Desk
+# FreightSight — live vessel tracking & freight-cost analysis
 
-**SIH 2026 prototype.** An intelligent, data-driven decision-support system for bulk-cargo
-procurement to India's **East Coast ports** (Paradip, Visakhapatnam, Gangavaram, Gopalpur,
-Dhamra, Sagar/Sandheads, Haldia). It replaces the current *reactive daily spot* approach with a
-*proactive, predictive* one: forecast freight rates, pick the right vessel class against real
-port constraints, time the market, and get early warnings — so the desk can move to
-**short-/medium-term multiple-voyage contracts**.
+A personal project. A decision-support tool for anyone with bulk cargo moving by sea: forecast
+freight rates, pick the right vessel class against real port constraints, time the market — and
+track each shipment against the vessel actually carrying it, with a delivered cost that updates
+as the voyage runs.
+
+Works for **any port pair worldwide**. India's East Coast ports (Paradip, Visakhapatnam,
+Gangavaram, Gopalpur, Dhamra, Sagar/Sandheads, Haldia) are the **calibrated core** — their
+lanes carry real published 2024–25 rate levels; every other lane runs on a transparent modelled
+estimate, flagged as such throughout.
 
 ---
 
-## What it does — mapped to the problem statement
+## What it does
 
-| PS ask | Where it lives | What you get |
+| Capability | Where it lives | What you get |
 |---|---|---|
 | **Freight-rate forecasting** (ML, time-series) | `backend/app/forecasting.py` | Per route × vessel weekly forecast, 80% band, monthly view, **rolling-origin back-test** with **learned ensemble weights** and **baseline comparison** (random walk, seasonal naive) + a skill-vs-random-walk figure. Ensemble of damped Holt-Winters + seasonal-naive-with-drift; driver correlations (bunker ρ, TCE ρ, congestion ρ). |
-| **(b) Vessel-type optimisation** vs port infrastructure | `backend/app/vessel_optimizer.py` + `reference_data.py` | Rules engine over Handysize→Capesize checking **max LOA, beam, governing draft, DWT/displacement** at *both* ports; parcel count, laytime, voyage days; **delivered cost/t including priced port-waiting + real weather-delay**; **Monte-Carlo robustness** ("optimal in N % of simulated rate paths"); **CO₂** per option (kt + g/t·nm). Ranked, explained recommendation. |
-| **(a) Optimal market-entry timing** | `backend/app/timing.py` | `WAIT` vs `FIX_NOW` window + expected saving; **spot vs 1/3/6/12-month period charter**, risk-adjusted; saving + cost-risk reduction vs the reactive rolling-spot approach. |
-| **Cover-timing validation** | `backend/app/decision_backtest.py` | **Walk-forward** back-test of three covering strategies — always-spot, always-period, timed — over ~2 years, on cost *and* cost-volatility. Substantiates the shift the PS asks for. |
+| **Vessel-type optimisation** vs port infrastructure | `backend/app/vessel_optimizer.py` + `reference_data.py` | Rules engine over Handysize→Capesize checking **max LOA, beam, governing draft, DWT/displacement** at *both* ports; parcel count, laytime, voyage days; **delivered cost/t including priced port-waiting + real weather-delay**; **Monte-Carlo robustness** ("optimal in N % of simulated rate paths"); **CO₂** per option (kt + g/t·nm). Ranked, explained recommendation. |
+| **Optimal market-entry timing** | `backend/app/timing.py` | `WAIT` vs `FIX_NOW` window + expected saving; **spot vs 1/3/6/12-month period charter**, risk-adjusted; saving + cost-risk reduction vs a reactive rolling-spot approach. |
+| **Cover-timing validation** | `backend/app/decision_backtest.py` | **Walk-forward** back-test of three covering strategies — always-spot, always-period, timed — over ~2 years, on cost *and* cost-volatility. |
 | **Multi-cargo procurement plan** | `backend/app/procurement_planner.py` | Turns a list of forward requirements into a **recommended contract mix** — how much of each lane to lock as period/COA vs leave to spot — with plan cost, saving and risk reduction vs all-spot. |
-| **(c) Idle-scenario management** | `backend/app/idle_risk.py` (`idle_outlook`) | Idle-risk index (0–100), estimated idle days / 12 wk, soft-demand weeks, alternative discharge ports. |
-| **(d) Risk mitigation / early warnings** | `backend/app/idle_risk.py` (`scan_risks`) | Severity-ranked alert feed: volatility spikes, congestion build-ups, bunker surges, seasonal troughs, rate extremes — each with an action. |
+| **Idle-scenario management** | `backend/app/idle_risk.py` (`idle_outlook`) | Idle-risk index (0–100), estimated idle days / 12 wk, soft-demand weeks, alternative discharge ports. |
+| **Risk mitigation / early warnings** | `backend/app/idle_risk.py` (`scan_risks`) | Severity-ranked alert feed: volatility spikes, congestion build-ups, bunker surges, seasonal troughs, rate extremes — each with an action. |
 | **Shipment tracking** | `backend/app/shipments.py` + `frontend` Shipments view | Each cargo booking tied to the vessel carrying it (MMSI): planned delivered cost, live position, **routed ETA** along the sea-lane graph, and a delivered-`$/t` that is **re-valued every ingest run** against fresh bunker / congestion / weather — the drift vs the baseline captured at booking is the headline. |
 | **Real-time vessel map** | `edge/` (Cloudflare Worker + Durable Object) | A **viewer-gated** AIS relay: one upstream AISStream socket is opened only while someone is watching the map and closed when the last viewer leaves (zero cost when idle). Falls back to 15-min REST polling when `VITE_LIVE_WS_URL` is unset. |
 | **Dashboard** | `frontend/` | Five views — **Scenario**, **Shipments**, **Procurement plan**, **Cover-timing test**, **Live map** — in a light editorial "data observatory" theme. |
-| **One-shot "run the desk"** | `POST /api/scenario` | Cargo + ports + duration → the whole analysis in one response. |
+| **One-shot analysis** | `POST /api/scenario` | Cargo + ports + duration → the whole analysis in one response. |
 
 ---
 
@@ -57,14 +60,16 @@ not a black box, and not fully synthetic.
    (`live` / `snapshot <date>` / `synthetic`); the dashboard header shows `hybrid · N/4 real
    feeds`.
 
-Port constraints (draft / LOA / beam / DWT / handling) for all 7 East Coast India ports and 10
+Port constraints (draft / LOA / beam / DWT / handling) for the 7 East Coast India ports and 10
 origin ports are hand-curated from port-authority pages and Wikipedia, cited inline in
-`reference_data.py`.
+`reference_data.py`; every other port comes from a ~200-port global registry with
+size-inferred constraints.
 
 `FREIGHTSIGHT_DISABLE_REALDATA=1` forces pure-synthetic; `FREIGHTSIGHT_SKIP_LIVE_PROBE=1` keeps
 the committed snapshot but skips outbound refresh (the container default).
 
-> Prototype only — **not for operational chartering.**
+> A personal project, not operational-grade — the numbers are a decision aid, not a substitute
+> for a broker or a chartering desk.
 
 ---
 
@@ -101,10 +106,10 @@ backend/  FastAPI + pandas + statsmodels
                          /api/system/{health,ingest-runs}  ·  /api/internal/refresh  ·
                          /api/map/{summary,vessels,vessel/{mmsi},ports}  ·
                          /api/shipments  (+ /{ref}, /{ref}/revalue)
-  worker/ingest.py       self-updating pipeline — fetch feeds → feed_snapshots →
-                         freight_rates / rate_forecasts / alerts history (runs in GitHub Actions */15)
-  worker/live.py         AIS sample → positions / vessels / voyages + dead-reckoning (Phase 3)
-  worker/ingest.py       ...also re-values every tracked shipment each run (Phase D)
+  worker/ingest.py       self-updating pipeline (GitHub Actions */15) — fetch feeds →
+                         feed_snapshots → freight_rates / rate_forecasts / alerts history,
+                         AIS sample, and re-value every tracked shipment
+  worker/live.py         AIS sample → positions / vessels / voyages + dead-reckoning
   alembic/               0001 core+geo · 0002 history · 0003 live · 0004 forecast model · 0005 shipments
   tests/                 test_smoke.py · test_geo.py · test_worker.py · test_live.py · test_shipments.py
   edge/                  Cloudflare Worker + FleetRelay Durable Object — viewer-gated
@@ -132,11 +137,10 @@ frontend/  Vite + React + TypeScript + Tailwind + Recharts + Leaflet  ("Ventrilo
 3. Render reads `render.yaml`, creates `freightsight-api` (Docker) + `freightsight-web`
    (static site) with the API base and CORS allow-list wired to the deterministic
    `*.onrender.com` URLs — **no manual step**. Click **Apply**.
-4. Open the `freightsight-web` URL — that's the link to share. API docs at
-   `freightsight-api`'s URL + `/docs`.
+4. Open the `freightsight-web` URL. API docs at `freightsight-api`'s URL + `/docs`.
 
 > Free tier: the API spins down when idle; the first hit after a pause takes ~10–20 s.
-> Use the $7 Starter plan for an always-on demo.
+> Use the $7 Starter plan for always-on.
 
 **Alternative — Docker Compose** (VM or laptop; one URL, nginx proxies `/api`, no CORS):
 
@@ -144,11 +148,12 @@ frontend/  Vite + React + TypeScript + Tailwind + Recharts + Leaflet  ("Ventrilo
 docker compose up --build -d      # dashboard → :8080 · API/docs → :8000/docs
 ```
 
-Full runbook, VM setup, verification and troubleshooting: **`deployment.md`** (git-ignored).
+**Real-time vessel map** — deploy the `edge/` Cloudflare Worker separately
+(`cd edge && npm i && npx wrangler deploy`), then point the frontend at it with
+`VITE_LIVE_WS_URL`. Without it the map falls back to 15-minute REST polling.
 
-The global-scope + live-monitoring expansion is built in four phases —
-[`docs/PHASES.md`](docs/PHASES.md) is the plain-language overview (what each phase
-is for and how to switch it on); [`docs/GLOBAL_LIVE_MONITORING.md`](docs/GLOBAL_LIVE_MONITORING.md)
+Activation steps for the DB-backed + live features are in `run_guide.md`
+(git-ignored); [`docs/GLOBAL_LIVE_MONITORING.md`](docs/GLOBAL_LIVE_MONITORING.md)
 is the detailed design record.
 
 ## Running it locally
@@ -177,9 +182,10 @@ Start the backend first. No internet required — the committed snapshot carries
 | `FREIGHTSIGHT_SKIP_LIVE_PROBE` | backend | `0` (`1` in Docker) | keep snapshot, skip live refresh |
 | `FREIGHTSIGHT_DISABLE_REALDATA` | backend | `0` | pure-synthetic (no snapshot) |
 | `DATABASE_URL` | backend + worker | _(unset)_ | Postgres/Supabase DSN; unset → bundled CSV + snapshot (Phase 1–3) |
-| `AISSTREAM_API_KEY` | worker | _(unset)_ | AISStream.io key; unset → live-map AIS step is a no-op |
+| `AISSTREAM_API_KEY` | worker + `edge/` | _(unset)_ | AISStream.io key; unset → AIS steps are a no-op |
 | `AIS_SAMPLE_SECONDS` | worker | `150` | AIS stream sampling window per ingest run |
 | `VITE_API_BASE` | frontend (build) | `""` (same-origin `/api`) | absolute API URL if cross-origin |
+| `VITE_LIVE_WS_URL` | frontend (build) | _(unset)_ | `wss://…/ws` of the `edge/` relay; unset → map uses 15-min REST polling |
 
 ---
 
@@ -218,5 +224,11 @@ curl -s localhost:8000/api/reference/market/provenance | jq
   proxy in the back-test) — no traded FFA / period curve is available.
 - The real-data snapshot is a point-in-time capture; the app refreshes it live when the public
   APIs are reachable, and falls back to the snapshot otherwise.
-- Distances are great-circle × a detour factor; canal routing is a simple Atlantic→Cape-of-
-  Good-Hope heuristic for undefined pairs.
+- Distances are great-circle × a detour factor for curated pairs; any other pair routes over a
+  ~100-node maritime waypoint graph (Dijkstra) that bends around real canals and capes.
+- Non-calibrated lanes have no traded benchmark — their forecast / timing / cover-timing run on
+  a **modelled** price history (this lane's voyage-economics level riding the shared dry-bulk
+  cycle). Directional, and labelled `modelled` everywhere it surfaces.
+- Live vessel positions are AIS: 15-minute sampled via the ingest worker, or near-real-time via
+  the `edge/` relay when deployed. Between fixes a vessel is dead-reckoned. Voyage inference is
+  a monitoring aid, not authoritative.
