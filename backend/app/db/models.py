@@ -230,7 +230,7 @@ class RateForecast(Base):
     exp_90d: Mapped[float | None] = mapped_column(Float)
     lo_90d: Mapped[float | None] = mapped_column(Float)
     hi_90d: Mapped[float | None] = mapped_column(Float)
-    model: Mapped[str | None] = mapped_column(String(48))
+    model: Mapped[str | None] = mapped_column(String(80))
     mape: Mapped[float | None] = mapped_column(Float)
     skill_vs_rw_pct: Mapped[float | None] = mapped_column(Float)
     run_id: Mapped[int | None] = mapped_column(Integer)

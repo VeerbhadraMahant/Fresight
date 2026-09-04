@@ -138,6 +138,11 @@ docker compose up --build -d      # dashboard → :8080 · API/docs → :8000/do
 
 Full runbook, VM setup, verification and troubleshooting: **`deployment.md`** (git-ignored).
 
+The global-scope + live-monitoring expansion is built in four phases —
+[`docs/PHASES.md`](docs/PHASES.md) is the plain-language overview (what each phase
+is for and how to switch it on); [`docs/GLOBAL_LIVE_MONITORING.md`](docs/GLOBAL_LIVE_MONITORING.md)
+is the detailed design record.
+
 ## Running it locally
 
 ```bash

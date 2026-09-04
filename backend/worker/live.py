@@ -135,7 +135,9 @@ def _dead_reckon_stale() -> int:
     with session_scope() as s:
         rows = _latest_ais_per_vessel(s)
         for mmsi, lat, lon, sog, cog, ts in rows:
-            age_min = (now - ts).total_seconds() / 60.0
+            # Postgres ``timestamptz`` reads back tz-aware; ``now`` is naive-UTC
+            # (SQLite hands back naive, so tests never caught the mismatch).
+            age_min = (now - _naive_utc(ts)).total_seconds() / 60.0
             if age_min < RECKON_AFTER_MIN or age_min > RECKON_MAX_HOURS * 60:
                 continue
             if not sog or sog < 0.5 or cog is None:

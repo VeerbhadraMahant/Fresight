@@ -172,17 +172,29 @@ def parse_message(msg: dict) -> AisPosition | AisStatic | None:
 # --------------------------------------------------------------------------- #
 async def _sample_async(seconds: int, bboxes: list, api_key: str) -> tuple[list, list]:
     import websockets
+    from websockets.exceptions import ConnectionClosed
 
     positions: dict[int, AisPosition] = {}
     statics: dict[int, AisStatic] = {}
+    seen = 0
     sub = {
         "APIKey": api_key,
         "BoundingBoxes": bboxes,
         "FilterMessageTypes": _WANT_TYPES,
     }
     deadline = time.monotonic() + seconds
+    # A global bounding box is a fire-hose: thousands of frames/sec, each parsed
+    # synchronously below. Client-initiated keepalive (ping_interval=20) then
+    # fights the read loop and the server force-closes with 1011 "keepalive ping
+    # timeout" before we collect anything. AISStream streams continuously, so a
+    # genuinely dead socket is caught by the recv timeout instead -- disable the
+    # ping, widen the queue, and keep whatever we gathered if the link drops.
     async with websockets.connect(
-        AISSTREAM_URL, ping_interval=20, ping_timeout=20, close_timeout=5, max_size=2**23
+        AISSTREAM_URL,
+        ping_interval=None,
+        close_timeout=5,
+        max_size=2**23,
+        max_queue=2**15,
     ) as ws:
         await ws.send(json.dumps(sub))
         while time.monotonic() < deadline:
@@ -191,6 +203,11 @@ async def _sample_async(seconds: int, bboxes: list, api_key: str) -> tuple[list,
                 raw = await asyncio.wait_for(ws.recv(), timeout=timeout)
             except TimeoutError:
                 break
+            except ConnectionClosed as exc:
+                log.warning("aisstream link closed mid-sample (%s) -- keeping %d/%d",
+                            str(exc)[:120], len(positions), seen)
+                break
+            seen += 1
             try:
                 msg = json.loads(raw)
             except ValueError:
@@ -203,6 +220,7 @@ async def _sample_async(seconds: int, bboxes: list, api_key: str) -> tuple[list,
                 positions[parsed.mmsi] = parsed
             elif isinstance(parsed, AisStatic):
                 statics[parsed.mmsi] = parsed
+    log.info("AIS stream: %d frames seen, %d vessels, %d static", seen, len(positions), len(statics))
     return list(positions.values()), list(statics.values())
 
 
@@ -228,8 +246,9 @@ def sample(seconds: int | None = None, bboxes: list | None = None) -> dict:
     try:
         pos, stat = asyncio.run(_sample_async(seconds, bboxes, api_key))
     except Exception as exc:  # pragma: no cover - network dependent
-        log.warning("AIS sample failed: %s", str(exc)[:200])
-        return {"ok": False, "reason": str(exc)[:200], "positions": [], "statics": []}
+        reason = f"{type(exc).__name__}: {exc}".strip()[:200] or type(exc).__name__
+        log.warning("AIS sample failed: %s", reason)
+        return {"ok": False, "reason": reason, "positions": [], "statics": []}
 
     log.info("AIS sample: %d positions, %d static frames over %ds", len(pos), len(stat), seconds)
     return {"ok": True, "reason": "", "positions": pos, "statics": stat}
