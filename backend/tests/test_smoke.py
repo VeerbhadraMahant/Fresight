@@ -98,9 +98,9 @@ def test_full_scenario(client):
     assert j["idle_outlook"]["idle_risk_index"] >= 0
 
 
-def test_scenario_synthesized_route_degrades_gracefully(client):
-    """A lane with no traded series still returns a vessel recommendation;
-    forecast / timing / idle come back null rather than erroring."""
+def test_scenario_modelled_lane_returns_full_analysis(client):
+    """A lane with no traded benchmark still gets forecast / timing / cover-timing
+    off a modelled history, tagged series_kind='modelled'."""
     r = client.post("/api/scenario", json={
         "origin": "USBAL", "destination": "INHAL", "commodity": "Coking Coal",
         "cargo_volume_t": 150_000, "contract_duration_months": 3,
@@ -108,9 +108,64 @@ def test_scenario_synthesized_route_degrades_gracefully(client):
     assert r.status_code == 200
     j = r.json()
     assert j["resolved"]["has_market_series"] is False
+    assert j["resolved"]["series_kind"] == "modelled"
     assert j["vessel_optimisation"]["recommendation"]["vessel"]  # still ranked
-    assert j["forecast"] is None and j["timing"] is None
+    assert j["forecast"] and len(j["forecast"]["forecast"]) >= 8
+    assert j["timing"]["charter_structure"]["recommendation"] in ("SPOT", "PERIOD")
+    assert j["decision_backtest"]["decision_points"] >= 4
     assert isinstance(j["risk_alerts"]["scoped"], list)
+
+
+def test_scenario_accepts_any_global_port_pair(client):
+    """Two ports that exist only in the global registry (never in the curated
+    18) still run end to end -- routing, ranking AND a modelled forecast."""
+    r = client.post("/api/scenario", json={
+        "origin": "NLRTM", "destination": "CNSHG", "commodity": "Iron Ore",
+        "cargo_volume_t": 160_000, "contract_duration_months": 6,
+        "forecast_horizon_days": 90})
+    assert r.status_code == 200, r.text
+    j = r.json()
+    assert j["resolved"]["series_kind"] == "modelled"
+    assert j["vessel_optimisation"]["recommendation"]["vessel"]
+    assert j["vessel_optimisation"]["route"]["distance_nm"] > 8000  # via Suez
+    assert j["forecast"]["forecast"][0]["lo"] <= j["forecast"]["forecast"][0]["hi"]
+    assert j["decision_backtest"]["decision_points"] >= 4
+
+
+def test_plan_accepts_global_lanes(client):
+    j = client.post("/api/plan", json={"requirements": [
+        {"origin": "BRSSZ", "destination": "CNSHG", "tonnes": 300_000},
+        {"origin": "AUHPT", "destination": "INPRT", "tonnes": 500_000},
+    ], "horizon_months": 6}).json()
+    assert len(j["lanes"]) == 2
+    assert j["totals"]["tonnes"] == 800_000
+
+
+def test_backtest_and_forecast_run_on_modelled_lanes(client):
+    """Cover-timing back-test and forecast work for any lane; modelled lanes are
+    tagged series_kind='modelled', calibrated ones 'traded'."""
+    m = client.get("/api/backtest/decisions", params={
+        "route_id": "NLRTM-CNSHG", "vessel": "Capesize", "contract_months": 6}).json()
+    assert m["decision_points"] >= 4
+    assert len(m["curve"]) == m["decision_points"]
+    assert m["series_kind"] == "modelled"
+
+    f = client.get("/api/forecast", params={
+        "route_id": "FRFOS-INPRT", "vessel": "Panamax", "horizon_days": 90}).json()
+    assert f["series_kind"] == "modelled"
+    assert f["backtest"]["ensemble"]["mape"] is not None
+    assert len(f["forecast"]) >= 8
+
+    # a real calibrated lane still reports as traded
+    t = client.get("/api/backtest/decisions", params={
+        "route_id": "AUHPT-INPRT", "vessel": "Capesize", "contract_months": 6}).json()
+    assert t["series_kind"] == "traded" and t["decision_points"] >= 4
+
+    # an unknown port is still a clean 400
+    assert client.post("/api/scenario", json={
+        "origin": "ZZZZZ", "destination": "INPRT", "commodity": "Thermal Coal",
+        "cargo_volume_t": 100_000, "contract_duration_months": 3,
+        "forecast_horizon_days": 90}).status_code == 400
 
 
 def test_every_discharge_port_resolves_a_scenario(client):

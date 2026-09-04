@@ -251,7 +251,11 @@ def _forecast_impl(market: MarketData, route_id: str, vessel: str,
     trailing_year = y.iloc[-52:]
     pct = float((trailing_year < y.iloc[-1]).mean() * 100)
     from . import reference_data as ref
-    sp = ref.ROUTES[route_id].seasonality_profile
+    if route_id in ref.ROUTES:
+        sp = ref.ROUTES[route_id].seasonality_profile
+    else:
+        from .modelled_lane import route_of
+        sp = route_of(route_id).seasonality_profile
     seasonal_now = ref.SEASONALITY[sp][pd.Timestamp.today().month - 1]
 
     def horizon_mean(days: int) -> float:

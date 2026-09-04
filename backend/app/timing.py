@@ -16,6 +16,7 @@ from __future__ import annotations
 import numpy as np
 import pandas as pd
 
+from . import reference_data as ref
 from .forecasting import forecast
 from .synthetic import MarketData
 
@@ -30,8 +31,9 @@ def _annualised_vol(series: pd.Series) -> float:
 def recommend(market: MarketData, route_id: str, vessel: str,
               contract_duration_months: int = 3, volume_t: float = 150_000,
               risk_aversion: float = 0.35, precomputed_fc: dict | None = None) -> dict:
-    if (route_id, vessel) not in market.freight.columns:
-        raise ValueError(f"no market for {route_id}/{vessel}")
+    if vessel not in ref.VESSEL_CLASSES:
+        raise ValueError(f"unknown vessel class {vessel!r}")
+    # market.freight_series() supplies a modelled history for non-traded lanes
 
     contract_weeks = int(round(contract_duration_months * WEEKS_PER_MONTH))
     horizon_days = max(200, contract_duration_months * 30 + 60)

@@ -15,6 +15,27 @@ export interface PortRef {
   source: string;
 }
 
+/** A hit from /api/reference/ports/search — the global registry (~200 ports). */
+export interface PortHit {
+  code: string;
+  name: string;
+  country: string | null;
+  country_name: string | null;
+  basin: string | null;
+  region: string | null;
+  role: string;
+  unlocode: string | null;
+  lat: number;
+  lon: number;
+  max_draft_m: number;
+  curated: boolean;
+}
+
+export interface PortSearchResponse {
+  query: string;
+  results: PortHit[];
+}
+
 export interface VesselRef {
   name: string;
   dwt: number;
@@ -200,6 +221,8 @@ export interface DecisionBacktest {
   decision_points: number;
   limited_history?: boolean;
   note?: string | null;
+  /** "traded" = real benchmark lane · "modelled" = estimate-on-estimate history */
+  series_kind?: "traded" | "modelled";
   curve: {
     date: string;
     choice: "SPOT" | "PERIOD";
@@ -227,7 +250,13 @@ export interface Emissions {
 
 export interface ScenarioResponse {
   request: ScenarioRequest;
-  resolved: { route_id: string; vessel: string; lane: string; has_market_series: boolean };
+  resolved: {
+    route_id: string;
+    vessel: string;
+    lane: string;
+    has_market_series: boolean;
+    series_kind?: "traded" | "modelled";
+  };
   vessel_optimisation: {
     route: RouteRef & { synthesized?: boolean };
     cargo: { commodity: string; volume_t: number; laycan_month: number | null };

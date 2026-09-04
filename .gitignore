@@ -34,3 +34,4 @@ backend/_*.db
 /docs/*
 !/docs/GLOBAL_LIVE_MONITORING.md
 /deployment.md
+/run_guide.md

@@ -32,6 +32,19 @@ def _suez_toll(dwt: int) -> float:
     return 5.5 * dwt
 
 
+def _port(code: str):
+    """Curated ``Port`` if we have one, else the global registry's ``ResolvedPort``
+    (same draft / handling fields), so any worldwide pair can be costed."""
+    p = PORTS.get(code)
+    if p is not None:
+        return p
+    from .geo import ports as _reg  # local import -> no import cycle at module load
+    rp = _reg.get(code)
+    if rp is None:
+        raise KeyError(code)
+    return rp
+
+
 def cargo_intake(vessel: VesselClass, load_port: Port, disch_port: Port,
                  requested_t: float | None = None) -> float:
     """Max liftable parcel given deadweight and the draft limit at both ends."""
@@ -83,7 +96,7 @@ class VoyageBreakdown:
 
 def estimate_voyage(route: Route, vessel: VesselClass, bunker_usd_t: float,
                     tce_usd_day: float, requested_t: float | None = None) -> VoyageBreakdown:
-    lp, dp = PORTS[route.origin], PORTS[route.destination]
+    lp, dp = _port(route.origin), _port(route.destination)
     cargo = cargo_intake(vessel, lp, dp, requested_t)
 
     laden_days = route.distance_nm / (vessel.laden_speed_kn * 24.0)

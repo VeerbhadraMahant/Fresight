@@ -1,11 +1,9 @@
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { lazy, Suspense, useCallback, useEffect, useMemo, useState } from "react";
 import { Download } from "lucide-react";
 import { api } from "./api";
 import type {
   MarketSnapshot,
-  PortRef,
   Provenance,
-  RouteRef,
   ScenarioRequest,
   ScenarioResponse,
   VesselRef,
@@ -20,22 +18,26 @@ import { TimingPanel } from "./components/TimingPanel";
 import { CoverTimingPanel } from "./components/CoverTimingPanel";
 import { IdlePanel } from "./components/IdlePanel";
 import { RiskFeed } from "./components/RiskFeed";
-import { PlanView } from "./components/PlanView";
-import { BacktestView } from "./components/BacktestView";
-import { MapView } from "./components/MapView";
 import { ApiErrorCard } from "./components/ApiErrorCard";
+
+// tab-gated, chart/map-heavy -> keep them out of the initial bundle
+const PlanView = lazy(() => import("./components/PlanView").then((m) => ({ default: m.PlanView })));
+const BacktestView = lazy(() =>
+  import("./components/BacktestView").then((m) => ({ default: m.BacktestView })),
+);
+const MapView = lazy(() => import("./components/MapView").then((m) => ({ default: m.MapView })));
+
+function ViewFallback() {
+  return <div className="shell py-20 text-center text-slate">loading…</div>;
+}
 import { exportScenarioPdf } from "./lib/exportPdf";
 import { pct, usdCompact } from "./lib/format";
 
 const DEFAULT_SCENARIO = DEMO.scenarioRequest as unknown as ScenarioRequest;
 
 // pre-computed sample so the dashboard is never empty on load
-const _ports = DEMO.ports as unknown as { load_ports: PortRef[]; discharge_ports: PortRef[] };
 const SAMPLE = {
-  loadPorts: _ports.load_ports,
-  dischargePorts: _ports.discharge_ports,
   vessels: DEMO.vessels as unknown as VesselRef[],
-  routes: DEMO.routes as unknown as RouteRef[],
   provenance: DEMO.provenance as unknown as Provenance,
   snapshot: DEMO.snapshot as unknown as MarketSnapshot,
   result: DEMO.scenario as unknown as ScenarioResponse,
@@ -43,10 +45,7 @@ const SAMPLE = {
 
 export default function App() {
   const [view, setView] = useState<View>("scenario");
-  const [loadPorts, setLoadPorts] = useState<PortRef[]>(SAMPLE.loadPorts);
-  const [dischargePorts, setDischargePorts] = useState<PortRef[]>(SAMPLE.dischargePorts);
   const [vessels, setVessels] = useState<VesselRef[]>(SAMPLE.vessels);
-  const [routes, setRoutes] = useState<RouteRef[]>(SAMPLE.routes);
   const [provenance, setProvenance] = useState<Provenance | null>(SAMPLE.provenance);
   const [snapshot, setSnapshot] = useState<MarketSnapshot | null>(SAMPLE.snapshot);
 
@@ -62,17 +61,12 @@ export default function App() {
     setLoading(true);
     setRunError(null);
     try {
-      const [p, v, r, prov, snap] = await Promise.all([
-        api.ports(),
+      const [v, prov, snap] = await Promise.all([
         api.vessels(),
-        api.routes(),
         api.provenance(),
         api.snapshot(),
       ]);
-      setLoadPorts(p.load_ports);
-      setDischargePorts(p.discharge_ports);
       setVessels(v);
-      setRoutes(r);
       setProvenance(prov);
       setSnapshot(snap);
       setResult(await api.scenario(DEFAULT_SCENARIO));
@@ -184,7 +178,11 @@ export default function App() {
         </div>
       )}
 
-      {view === "map" && <MapView />}
+      {view === "map" && (
+        <Suspense fallback={<ViewFallback />}>
+          <MapView />
+        </Suspense>
+      )}
 
       {view !== "map" && (
       <section className="band-canvas">
@@ -203,8 +201,6 @@ export default function App() {
 
               <div className="mt-10">
                 <ScenarioPanel
-                  loadPorts={loadPorts}
-                  dischargePorts={dischargePorts}
                   vessels={vessels}
                   value={scenario}
                   onChange={setScenario}
@@ -237,7 +233,9 @@ export default function App() {
                 from many single spot fixtures to fewer medium-term multiple-voyage contracts.
               </p>
               <div className="mt-10">
-                <PlanView loadPorts={loadPorts} dischargePorts={dischargePorts} />
+                <Suspense fallback={<ViewFallback />}>
+                  <PlanView />
+                </Suspense>
               </div>
             </>
           )}
@@ -250,7 +248,9 @@ export default function App() {
                 would each have cost over the last two years.
               </p>
               <div className="mt-10">
-                <BacktestView routes={routes} vessels={vessels} />
+                <Suspense fallback={<ViewFallback />}>
+                  <BacktestView vessels={vessels} />
+                </Suspense>
               </div>
             </>
           )}
@@ -286,15 +286,26 @@ export default function App() {
 
           <section className="band-canvas">
             <div className="shell space-y-14 py-16">
+              {result.resolved.series_kind === "modelled" && (
+                <div className="card border-l-2 border-ember">
+                  <p className="caption max-w-3xl text-graphite">
+                    <span className="eyebrow">modelled lane</span> — {result.resolved.lane} has no
+                    traded freight benchmark. The forecast, timing and cover-timing analysis below run
+                    on a <em>modelled</em> price history: this lane's bottom-up voyage-economics level
+                    riding the shared dry-bulk cycle, with the route's seasonal profile. Treat it as
+                    directional. Calibrated East-Coast-India lanes use real traded rates.
+                  </p>
+                </div>
+              )}
               {result.forecast ? (
                 <ForecastPanel fc={result.forecast} />
               ) : (
                 <div className="card-signature">
                   <h2 className="h-section">Freight forecast</h2>
                   <p className="caption mt-3 max-w-2xl">
-                    No traded freight series for {result.resolved.route_id} / {result.resolved.vessel}.
-                    Forecasting, timing &amp; the cover-timing test are shown only for modelled lanes;
-                    the vessel optimisation below uses the voyage-economics model.
+                    Could not build a price series for {result.resolved.route_id} /{" "}
+                    {result.resolved.vessel}. The vessel optimisation below still uses the
+                    voyage-economics model.
                   </p>
                 </div>
               )}

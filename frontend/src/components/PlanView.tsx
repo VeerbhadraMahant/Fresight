@@ -1,22 +1,17 @@
 import { useState } from "react";
 import { Plus, Trash2 } from "lucide-react";
 import { api } from "../api";
-import type { PlanResponse, PortRef, RequirementItem } from "../types";
+import type { PlanResponse, RequirementItem } from "../types";
 import { pct, usdCompact } from "../lib/format";
+import { PortPicker } from "./PortPicker";
 
 const START: RequirementItem[] = [
   { origin: "AUHPT", destination: "INPRT", tonnes: 900_000 },
   { origin: "IDMBR", destination: "INVTZ", tonnes: 400_000 },
-  { origin: "MZMPM", destination: "INPRT", tonnes: 250_000 },
+  { origin: "NLRTM", destination: "CNSHG", tonnes: 250_000 },
 ];
 
-export function PlanView({
-  loadPorts,
-  dischargePorts,
-}: {
-  loadPorts: PortRef[];
-  dischargePorts: PortRef[];
-}) {
+export function PlanView() {
   const [rows, setRows] = useState<RequirementItem[]>(START);
   const [months, setMonths] = useState(6);
   const [res, setRes] = useState<PlanResponse | null>(null);
@@ -53,35 +48,34 @@ export function PlanView({
 
         <div className="space-y-3">
           {rows.map((r, i) => (
-            <div key={i} className="grid grid-cols-2 gap-3 md:grid-cols-[1fr_1fr_160px_40px]">
-              <select className="field" value={r.origin} onChange={(e) => set(i, { origin: e.target.value })}>
-                {loadPorts.map((p) => (
-                  <option key={p.code} value={p.code}>
-                    {p.name} · {p.country}
-                  </option>
-                ))}
-              </select>
-              <select
-                className="field"
-                value={r.destination}
-                onChange={(e) => set(i, { destination: e.target.value })}
-              >
-                {dischargePorts.map((p) => (
-                  <option key={p.code} value={p.code}>
-                    {p.name}
-                  </option>
-                ))}
-              </select>
-              <input
-                type="number"
-                className="field num"
-                step={50_000}
-                value={r.tonnes}
-                onChange={(e) => set(i, { tonnes: Number(e.target.value) })}
+            <div
+              key={i}
+              className="grid grid-cols-2 items-start gap-3 md:grid-cols-[1fr_1fr_160px_40px]"
+            >
+              <PortPicker
+                label={i === 0 ? "Load port" : ""}
+                value={r.origin}
+                onChange={(c) => set(i, { origin: c })}
               />
+              <PortPicker
+                label={i === 0 ? "Discharge port" : ""}
+                value={r.destination}
+                onChange={(c) => set(i, { destination: c })}
+              />
+              <label>
+                {i === 0 && <span className="field-label">Tonnes</span>}
+                <input
+                  type="number"
+                  className="field num"
+                  step={50_000}
+                  value={r.tonnes}
+                  onChange={(e) => set(i, { tonnes: Number(e.target.value) })}
+                />
+              </label>
               <button
                 type="button"
                 className="btn-ghost !min-h-0 !p-0"
+                style={{ marginTop: i === 0 ? "1.9rem" : 0 }}
                 aria-label="remove requirement"
                 onClick={() => setRows(rows.filter((_, j) => j !== i))}
               >

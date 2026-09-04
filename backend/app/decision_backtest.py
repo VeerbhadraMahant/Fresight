@@ -39,9 +39,7 @@ def _stats(x: np.ndarray) -> dict:
 
 def decision_backtest(market: MarketData, route_id: str, vessel: str,
                       contract_months: int = 3) -> dict:
-    if (route_id, vessel) not in market.freight.columns:
-        raise ValueError(f"no market series for {route_id} / {vessel}")
-
+    # market.freight_series() supplies a modelled history for non-traded lanes
     y = _weekly(market.freight_series(route_id, vessel))
     k = max(4, int(round(contract_months * WEEKS_PER_MONTH)))
 

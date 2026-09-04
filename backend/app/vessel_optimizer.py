@@ -18,10 +18,25 @@ from dataclasses import dataclass
 import numpy as np
 
 from . import reference_data as ref
+from .geo import ports as _port_reg
+from .geo.searoute import sea_distance_nm
 from .synthetic import MarketData
 from .voyage_economics import estimate_voyage
 
 DETOUR_FACTOR = 1.16  # great-circle -> practical sailing distance
+
+
+def _resolve_port(code: str):
+    """A curated ``ref.Port`` when we have one, else the global registry's
+    ``ResolvedPort`` (structurally compatible for everything the optimiser
+    reads: lat/lon, max_loa/beam/draft, max_dwt, handling_tpd, transload)."""
+    p = ref.PORTS.get(code)
+    if p is not None:
+        return p
+    rp = _port_reg.get(code)
+    if rp is None:
+        raise ValueError(f"unknown port code: {code!r}")
+    return rp
 
 
 def _haversine_nm(a: ref.Port, b: ref.Port) -> float:
@@ -37,14 +52,23 @@ def resolve_route(origin: str, destination: str) -> ref.Route:
     for r in ref.ROUTES.values():
         if r.origin == origin and r.destination == destination:
             return r
-    o, d = ref.PORTS[origin], ref.PORTS[destination]
-    dist = int(round(_haversine_nm(o, d) * DETOUR_FACTOR))
-    canal = "none"
-    # crude: Atlantic origin -> India implies Cape of Good Hope routing
-    if o.region in ("USA",) or (o.region == "Russia" and o.lon < 60):
-        canal = "good-hope"
-        dist = int(dist * 1.15)
-    prof = {"India-EastCoast": "monsoon"}.get(d.region, "monsoon")
+    o, d = _resolve_port(origin), _resolve_port(destination)
+    if origin in ref.PORTS and destination in ref.PORTS:
+        # curated pair, no calibrated route -> keep the original crude estimate
+        dist = int(round(_haversine_nm(o, d) * DETOUR_FACTOR))
+        canal = "none"
+        if o.region in ("USA",) or (o.region == "Russia" and o.lon < 60):
+            canal = "good-hope"
+            dist = int(dist * 1.15)
+        prof = {"India-EastCoast": "monsoon"}.get(d.region, "monsoon")
+    else:
+        # any global pair -> basin-aware sea-route graph (correct canals/capes)
+        dist = int(round(sea_distance_nm(
+            o.lat, o.lon, d.lat, d.lon,
+            getattr(o, "basin", None), getattr(d, "basin", None),
+        )))
+        canal = "none"
+        prof = "monsoon"
     return ref.Route(
         id=f"{origin}-{destination}", origin=origin, destination=destination,
         distance_nm=dist, canal=canal, lane=f"{o.name} -> {d.name}",
@@ -52,8 +76,12 @@ def resolve_route(origin: str, destination: str) -> ref.Route:
     )
 
 
-def _expected_wait_days(market: MarketData, port_code: str, month: int | None = None) -> float:
-    s = market.congestion[port_code]
+def _expected_wait_days(market: MarketData, port_code: str, month: int | None = None,
+                        base_days: float = 2.0) -> float:
+    s = market.congestion.get(port_code) if hasattr(market.congestion, "get") else None
+    if s is None:
+        # no observed congestion series for this port -> its long-run base
+        return round(float(base_days), 2)
     recent = float(s.iloc[-21:].mean())
     if month is not None:
         same_month = s[s.index.month == month]
@@ -113,10 +141,8 @@ class VesselOption:
 def optimise(market: MarketData, origin: str, destination: str, commodity: str,
              cargo_volume_t: float, laycan_month: int | None = None,
              use_forecast_horizon_days: int | None = None) -> dict:
-    if origin not in ref.PORTS or destination not in ref.PORTS:
-        raise ValueError("unknown port code")
+    lp, dp = _resolve_port(origin), _resolve_port(destination)   # raises ValueError if unknown
     route = resolve_route(origin, destination)
-    lp, dp = ref.PORTS[origin], ref.PORTS[destination]
     bunker_now = float(market.bunker.iloc[-1])
 
     options: list[VesselOption] = []
@@ -169,8 +195,10 @@ def optimise(market: MarketData, origin: str, destination: str, commodity: str,
             rate = market.latest_freight(route.id, name)
 
         shipments = max(1, math.ceil(cargo_volume_t / max(intake, 1.0)))
-        wait_load = _expected_wait_days(market, origin, laycan_month)
-        wait_disch = _expected_wait_days(market, destination, laycan_month)
+        wait_load = _expected_wait_days(market, origin, laycan_month,
+                                       base_days=lp.congestion_base_days)
+        wait_disch = _expected_wait_days(market, destination, laycan_month,
+                                        base_days=dp.congestion_base_days)
         # real Open-Meteo weather-delay at the discharge port (next 16 days,
         # scaled to a full voyage turn)
         wx = market.weather.get(destination, {})

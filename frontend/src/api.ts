@@ -7,7 +7,9 @@ import type {
   MarketSnapshot,
   PlanRequest,
   PlanResponse,
+  PortHit,
   PortRef,
+  PortSearchResponse,
   Provenance,
   RouteRef,
   ScenarioRequest,
@@ -37,6 +39,9 @@ async function post<T>(path: string, body: unknown): Promise<T> {
 export const api = {
   health: () => get<{ status: string }>("/api/health"),
   ports: () => get<{ discharge_ports: PortRef[]; load_ports: PortRef[] }>("/api/reference/ports"),
+  portSearch: (q: string) =>
+    get<PortSearchResponse>("/api/reference/ports/search", { q, limit: 24 }),
+  resolvePort: (ident: string) => get<PortHit>("/api/reference/port", { ident }),
   vessels: () => get<VesselRef[]>("/api/reference/vessels"),
   routes: () => get<RouteRef[]>("/api/reference/routes"),
   provenance: () => get<Provenance>("/api/reference/market/provenance"),

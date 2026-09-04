@@ -55,21 +55,32 @@ class MarketData:
 
     # ---- convenience accessors ------------------------------------------- #
     def freight_series(self, route_id: str, vessel: str) -> pd.Series:
-        return self.freight[(route_id, vessel)].dropna()
+        if (route_id, vessel) in self.freight.columns:
+            return self.freight[(route_id, vessel)].dropna()
+        # any other resolvable pair -> a modelled (estimate-on-estimate) history
+        from .modelled_lane import series_for
+        return series_for(self, route_id, vessel)
 
     def latest_freight(self, route_id: str, vessel: str) -> float:
         return float(self.freight_series(route_id, vessel).iloc[-1])
 
     def feature_frame(self, route_id: str, vessel: str) -> pd.DataFrame:
         """Assemble the modelling frame for one route x vessel."""
-        r = ref.ROUTES[route_id]
+        if route_id in ref.ROUTES:
+            r = ref.ROUTES[route_id]
+        else:
+            from .modelled_lane import route_of
+            r = route_of(route_id)
         y = self.freight_series(route_id, vessel).rename("rate")
         df = pd.DataFrame(index=y.index)
         df["rate"] = y
         df["bunker"] = self.bunker.reindex(y.index).ffill()
         df["tce"] = self.tce[vessel].reindex(y.index).ffill()
-        df["cong_load"] = self.congestion[r.origin].reindex(y.index).ffill()
-        df["cong_disch"] = self.congestion[r.destination].reindex(y.index).ffill()
+        _cong_mean = self.congestion.mean(axis=1)
+        _cl = self.congestion.get(r.origin, _cong_mean)
+        _cd = self.congestion.get(r.destination, _cong_mean)
+        df["cong_load"] = _cl.reindex(y.index).ffill()
+        df["cong_disch"] = _cd.reindex(y.index).ffill()
         df["commodity_index"] = self.drivers["commodity_index"].reindex(y.index).ffill()
         df["global_ip"] = self.drivers["global_ip"].reindex(y.index).ffill()
         df["sentiment"] = self.drivers["sentiment"].reindex(y.index).ffill()

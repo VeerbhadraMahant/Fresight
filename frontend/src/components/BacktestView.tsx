@@ -9,23 +9,21 @@ import {
   YAxis,
 } from "recharts";
 import { api } from "../api";
-import type { DecisionBacktest, RouteRef, VesselRef } from "../types";
+import type { DecisionBacktest, VesselRef } from "../types";
 import { C } from "../lib/theme";
 import { shortDate } from "../lib/format";
+import { PortPicker } from "./PortPicker";
 
-export function BacktestView({
-  routes,
-  vessels,
-}: {
-  routes: RouteRef[];
-  vessels: VesselRef[];
-}) {
-  const [routeId, setRouteId] = useState("AUHPT-INPRT");
+export function BacktestView({ vessels }: { vessels: VesselRef[] }) {
+  const [origin, setOrigin] = useState("AUHPT");
+  const [destination, setDestination] = useState("INPRT");
   const [vessel, setVessel] = useState("Capesize");
   const [months, setMonths] = useState(6);
   const [data, setData] = useState<DecisionBacktest | null>(null);
   const [loading, setLoading] = useState(false);
   const [err, setErr] = useState<string | null>(null);
+
+  const routeId = `${origin}-${destination}`;
 
   useEffect(() => {
     let live = true;
@@ -41,6 +39,7 @@ export function BacktestView({
     };
   }, [routeId, vessel, months]);
 
+  const modelled = data?.series_kind === "modelled";
   const s = data?.strategies;
 
   return (
@@ -54,17 +53,9 @@ export function BacktestView({
           Over the last ~2 years, at monthly decision points and using only prior data, what would
           each covering strategy have cost — rolling spot, standing period cover, or our timed engine?
         </p>
-        <div className="flex flex-wrap items-end gap-4">
-          <label>
-            <span className="field-label">Lane</span>
-            <select className="field" value={routeId} onChange={(e) => setRouteId(e.target.value)}>
-              {routes.map((r) => (
-                <option key={r.id} value={r.id}>
-                  {r.lane}
-                </option>
-              ))}
-            </select>
-          </label>
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
+          <PortPicker label="Load port" value={origin} onChange={setOrigin} />
+          <PortPicker label="Discharge port" value={destination} onChange={setDestination} />
           <label>
             <span className="field-label">Vessel</span>
             <select className="field" value={vessel} onChange={(e) => setVessel(e.target.value)}>
@@ -89,9 +80,16 @@ export function BacktestView({
               ))}
             </select>
           </label>
-          {loading && <span className="meta">loading…</span>}
         </div>
+        {loading && <span className="meta mt-3 block">loading…</span>}
         {err && <p className="caption mt-4 text-graphite">{err}</p>}
+        {modelled && (
+          <p className="caption mt-4 max-w-3xl border-l-2 border-ember pl-4 text-graphite">
+            No traded benchmark for this lane — the back-test runs on a <em>modelled</em> history
+            (this lane's voyage-economics level riding the shared dry-bulk cycle). Directional, not
+            a traded-index result.
+          </p>
+        )}
       </section>
 
       {data && s && (

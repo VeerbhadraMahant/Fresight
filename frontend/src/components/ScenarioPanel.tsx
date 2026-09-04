@@ -1,20 +1,17 @@
-import type { PortRef, ScenarioRequest, VesselRef } from "../types";
+import type { ScenarioRequest, VesselRef } from "../types";
 import { MONTH_NAMES } from "../lib/format";
+import { PortPicker } from "./PortPicker";
 
 const COMMODITIES = ["Thermal Coal", "Coking Coal", "Iron Ore", "Bauxite", "Limestone"];
 const DURATIONS = [1, 3, 6, 12];
 
 export function ScenarioPanel({
-  loadPorts,
-  dischargePorts,
   vessels,
   value,
   onChange,
   onSubmit,
   loading,
 }: {
-  loadPorts: PortRef[];
-  dischargePorts: PortRef[];
   vessels: VesselRef[];
   value: ScenarioRequest;
   onChange: (v: ScenarioRequest) => void;
@@ -38,31 +35,18 @@ export function ScenarioPanel({
       </div>
 
       <div className="grid grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-4">
-        <label>
-          <span className="field-label">Load port — origin</span>
-          <select className="field" value={value.origin} onChange={(e) => set("origin", e.target.value)}>
-            {loadPorts.map((p) => (
-              <option key={p.code} value={p.code}>
-                {p.name} · {p.country}
-              </option>
-            ))}
-          </select>
-        </label>
+        <PortPicker
+          label="Load port — origin"
+          value={value.origin}
+          onChange={(c) => set("origin", c)}
+        />
 
-        <label>
-          <span className="field-label">Discharge port — E. Coast India</span>
-          <select
-            className="field"
-            value={value.destination}
-            onChange={(e) => set("destination", e.target.value)}
-          >
-            {dischargePorts.map((p) => (
-              <option key={p.code} value={p.code}>
-                {p.name} · {p.max_draft_m} m draft
-              </option>
-            ))}
-          </select>
-        </label>
+        <PortPicker
+          label="Discharge port — destination"
+          value={value.destination}
+          onChange={(c) => set("destination", c)}
+          hint="any port worldwide"
+        />
 
         <label>
           <span className="field-label">Commodity</span>
