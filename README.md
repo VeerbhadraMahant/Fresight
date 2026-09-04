@@ -20,7 +20,9 @@ port constraints, time the market, and get early warnings — so the desk can mo
 | **Multi-cargo procurement plan** | `backend/app/procurement_planner.py` | Turns a list of forward requirements into a **recommended contract mix** — how much of each lane to lock as period/COA vs leave to spot — with plan cost, saving and risk reduction vs all-spot. |
 | **(c) Idle-scenario management** | `backend/app/idle_risk.py` (`idle_outlook`) | Idle-risk index (0–100), estimated idle days / 12 wk, soft-demand weeks, alternative discharge ports. |
 | **(d) Risk mitigation / early warnings** | `backend/app/idle_risk.py` (`scan_risks`) | Severity-ranked alert feed: volatility spikes, congestion build-ups, bunker surges, seasonal troughs, rate extremes — each with an action. |
-| **Dashboard** | `frontend/` | Three views — **Scenario**, **Procurement plan**, **Cover-timing test** — in a light editorial "data observatory" theme. |
+| **Shipment tracking** | `backend/app/shipments.py` + `frontend` Shipments view | Each cargo booking tied to the vessel carrying it (MMSI): planned delivered cost, live position, **routed ETA** along the sea-lane graph, and a delivered-`$/t` that is **re-valued every ingest run** against fresh bunker / congestion / weather — the drift vs the baseline captured at booking is the headline. |
+| **Real-time vessel map** | `edge/` (Cloudflare Worker + Durable Object) | A **viewer-gated** AIS relay: one upstream AISStream socket is opened only while someone is watching the map and closed when the last viewer leaves (zero cost when idle). Falls back to 15-min REST polling when `VITE_LIVE_WS_URL` is unset. |
+| **Dashboard** | `frontend/` | Five views — **Scenario**, **Shipments**, **Procurement plan**, **Cover-timing test**, **Live map** — in a light editorial "data observatory" theme. |
 | **One-shot "run the desk"** | `POST /api/scenario` | Cargo + ports + duration → the whole analysis in one response. |
 
 ---
@@ -91,16 +93,22 @@ backend/  FastAPI + pandas + statsmodels
                          any-port-to-any-port voyage economics
     live/                AIS (AISStream.io) parser + sampler · spherical dead-reckoning
     data/ports_global.csv   ~130 major world ports (merged with the 18 curated ports)
+    shipments.py         cargo booking ↔ assigned vessel ↔ live delivered-cost;
+                         revalue() re-runs the economics + routed ETA per ingest run
     routers/             /api/reference/*  ·  /api/{forecast,vessel,timing,risk,idle,
                          backtest/decisions,plan,scenario}  ·  /api/reference/ports/search,
                          /api/reference/port  ·  /api/geo/{route,lane}  ·
                          /api/system/{health,ingest-runs}  ·  /api/internal/refresh  ·
-                         /api/map/{summary,vessels,vessel/{mmsi},ports}
+                         /api/map/{summary,vessels,vessel/{mmsi},ports}  ·
+                         /api/shipments  (+ /{ref}, /{ref}/revalue)
   worker/ingest.py       self-updating pipeline — fetch feeds → feed_snapshots →
                          freight_rates / rate_forecasts / alerts history (runs in GitHub Actions */15)
   worker/live.py         AIS sample → positions / vessels / voyages + dead-reckoning (Phase 3)
-  alembic/               migrations 0001 (core + geo) · 0002 (Phase 2 history) · 0003 (live cols)
-  tests/                 test_smoke.py (19) + test_geo.py (22) + test_worker.py (7) + test_live.py (15)
+  worker/ingest.py       ...also re-values every tracked shipment each run (Phase D)
+  alembic/               0001 core+geo · 0002 history · 0003 live · 0004 forecast model · 0005 shipments
+  tests/                 test_smoke.py · test_geo.py · test_worker.py · test_live.py · test_shipments.py
+  edge/                  Cloudflare Worker + FleetRelay Durable Object — viewer-gated
+                         live AIS relay (wss://…/ws); no DB writes, pure pass-through
   scripts/  build_real_snapshot.py · load_ports.py (seed) · import_wpi.py · start.sh (container entrypoint)
   .github/workflows/  ci.yml · ingest.yml (*/15) · keepwarm.yml (*/10)
   Dockerfile · pyproject.toml (ruff) · pytest.ini · alembic.ini · requirements*.txt · .env.example
