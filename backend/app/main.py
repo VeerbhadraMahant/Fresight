@@ -22,7 +22,7 @@ from fastapi.middleware.cors import CORSMiddleware
 
 from . import __version__
 from .market_store import STORE
-from .routers import analysis, geo, reference, system
+from .routers import analysis, geo, reference, shipments, system
 from .routers import map as map_router
 
 logging.basicConfig(
@@ -67,6 +67,7 @@ app.include_router(analysis.router)
 app.include_router(geo.router)
 app.include_router(system.router)
 app.include_router(map_router.router)
+app.include_router(shipments.router)
 
 
 @app.get("/api/health", tags=["meta"])

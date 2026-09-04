@@ -3,6 +3,7 @@ import { pct } from "../lib/format";
 
 const VIEWS = [
   ["scenario", "Scenario"],
+  ["shipments", "Shipments"],
   ["plan", "Procurement plan"],
   ["backtest", "Cover-timing test"],
   ["map", "Live map"],

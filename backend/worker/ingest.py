@@ -160,6 +160,26 @@ def _ingest_ais() -> dict:
     return summary
 
 
+def _revalue_shipments(md) -> dict:
+    """Phase D: value every tracked shipment against the fresh snapshot + live
+    positions and append a ``shipment_costs`` point. Best-effort, isolated."""
+    from app.shipments import revalue_all
+
+    t0 = datetime.now(UTC)
+    ok, err, summary = True, None, {}
+    try:
+        summary = revalue_all(market=md)
+    except Exception as exc:  # pragma: no cover
+        ok, err = False, str(exc)[:400]
+        log.exception("shipment revaluation failed")
+    with session_scope() as s:
+        s.add(IngestRun(
+            feed="shipments", started_at=t0, finished_at=datetime.now(UTC), ok=ok,
+            rows=int(summary.get("valued", 0)), detail=summary, error=err,
+        ))
+    return summary
+
+
 def _persist_alerts(md) -> dict:
     now = datetime.now(UTC)
     scan = scan_risks(md, max_alerts=60)
@@ -210,6 +230,7 @@ def run() -> dict:
         "forecasts": _persist_forecasts(md),
         "alerts": _persist_alerts(md),
         "ais": _ingest_ais(),
+        "shipments": _revalue_shipments(md),
     }
 
     with session_scope() as s:

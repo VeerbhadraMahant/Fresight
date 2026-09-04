@@ -14,6 +14,12 @@ import type {
   RouteRef,
   ScenarioRequest,
   ScenarioResponse,
+  Shipment,
+  ShipmentCreate,
+  ShipmentDetail,
+  ShipmentPatch,
+  ShipmentsResponse,
+  ShipmentValuation,
   VesselRef,
 } from "./types";
 
@@ -34,6 +40,21 @@ async function post<T>(path: string, body: unknown): Promise<T> {
   });
   if (!r.ok) throw new Error(`${path} -> ${r.status} ${await r.text()}`);
   return r.json() as Promise<T>;
+}
+
+async function patch<T>(path: string, body: unknown): Promise<T> {
+  const r = await fetch(`${BASE}${path}`, {
+    method: "PATCH",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(body),
+  });
+  if (!r.ok) throw new Error(`${path} -> ${r.status} ${await r.text()}`);
+  return r.json() as Promise<T>;
+}
+
+async function del(path: string): Promise<void> {
+  const r = await fetch(`${BASE}${path}`, { method: "DELETE" });
+  if (!r.ok) throw new Error(`${path} -> ${r.status} ${await r.text()}`);
 }
 
 export const api = {
@@ -58,4 +79,14 @@ export const api = {
   mapVessels: (bbox?: string) =>
     get<MapVesselsResponse>("/api/map/vessels", bbox ? { bbox, limit: 1200 } : { limit: 1200 }),
   mapVessel: (mmsi: number) => get<MapVesselDetail>(`/api/map/vessel/${mmsi}`),
+
+  // Phase D: shipment tracking
+  shipments: () => get<ShipmentsResponse>("/api/shipments"),
+  shipment: (ref: string) => get<ShipmentDetail>(`/api/shipments/${ref}`),
+  createShipment: (body: ShipmentCreate) => post<Shipment>("/api/shipments", body),
+  patchShipment: (ref: string, body: ShipmentPatch) =>
+    patch<Shipment>(`/api/shipments/${ref}`, body),
+  deleteShipment: (ref: string) => del(`/api/shipments/${ref}`),
+  revalueShipment: (ref: string) =>
+    post<ShipmentValuation>(`/api/shipments/${ref}/revalue`, {}),
 };

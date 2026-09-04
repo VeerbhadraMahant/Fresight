@@ -422,3 +422,121 @@ export interface MarketSnapshot {
   congestion_days: Record<string, number>;
   rates: { route_id: string; lane: string; vessel: string; rate_usd_t: number; change_30d_pct: number | null }[];
 }
+
+// ---- Phase D: shipments ------------------------------------------------- //
+export type ShipmentStatus = "planned" | "in_transit" | "arrived" | "cancelled";
+
+export interface ShipmentLatestCost {
+  ts: string | null;
+  delivered_usd_per_t: number;
+  drift_usd_per_t: number | null;
+  progress_pct: number | null;
+  eta_ts: string | null;
+}
+
+export interface Shipment {
+  ref: string;
+  commodity: string;
+  cargo_t: number;
+  origin_code: string;
+  dest_code: string;
+  vessel_class: string | null;
+  assigned_mmsi: number | null;
+  laycan_start: string | null;
+  laycan_end: string | null;
+  contract_months: number;
+  status: ShipmentStatus;
+  baseline_usd_per_t: number | null;
+  baseline_at: string | null;
+  notes: string | null;
+  created_at: string | null;
+  updated_at: string | null;
+  latest_cost?: ShipmentLatestCost | null;
+}
+
+export interface ShipmentsResponse {
+  enabled: boolean;
+  reason?: string;
+  shipments: Shipment[];
+}
+
+export interface ShipmentValuation {
+  ts: string;
+  vessel_class: string;
+  delivered_usd_per_t: number;
+  freight_usd_per_t: number;
+  bunker_usd_t: number;
+  baseline_usd_per_t: number | null;
+  drift_usd_per_t: number | null;
+  drift_pct: number | null;
+  cargo_cost_usd: number;
+  progress_pct: number | null;
+  distance_remaining_nm: number | null;
+  distance_total_nm: number | null;
+  speed_used_kn: number | null;
+  eta_ts: string | null;
+  shipments_required: number | null;
+}
+
+export interface ShipmentCostPoint {
+  ts: string | null;
+  delivered_usd_per_t: number;
+  drift_usd_per_t: number | null;
+  bunker_usd_t: number | null;
+  progress_pct: number | null;
+  eta_ts: string | null;
+}
+
+export interface ShipmentLiveVessel {
+  mmsi: number;
+  name: string | null;
+  type: string | null;
+  imo: number | null;
+  destination: string | null;
+  eta_raw: string | null;
+  lat: number | null;
+  lon: number | null;
+  sog_kn: number | null;
+  cog_deg: number | null;
+  nav_status: string | null;
+  source: string | null;
+  ts: string | null;
+}
+
+export interface ShipmentDetail {
+  enabled: boolean;
+  shipment: Shipment;
+  live_vessel: ShipmentLiveVessel | null;
+  valuation: ShipmentValuation;
+  analysis: {
+    route: (RouteRef & { synthesized?: boolean }) | null;
+    recommendation: ScenarioResponse["vessel_optimisation"]["recommendation"];
+    chosen_option: VesselOption | null;
+    options: VesselOption[] | null;
+    emissions: Emissions | null;
+    bunker_used_usd_t: number | null;
+    route_geometry: [number, number][]; // [lon, lat] GeoJSON order
+    ports: { origin: PortHit | null; destination: PortHit | null };
+  };
+  cost_history: ShipmentCostPoint[];
+}
+
+export interface ShipmentCreate {
+  origin_code: string;
+  dest_code: string;
+  commodity?: string;
+  cargo_t: number;
+  vessel_class?: string | null;
+  assigned_mmsi?: number | null;
+  laycan_start?: string | null;
+  contract_months?: number;
+}
+
+export interface ShipmentPatch {
+  status?: ShipmentStatus;
+  assigned_mmsi?: number | null;
+  vessel_class?: string | null;
+  contract_months?: number;
+  notes?: string | null;
+  rebaseline?: boolean;
+}

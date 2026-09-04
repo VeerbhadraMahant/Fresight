@@ -264,8 +264,68 @@ class Alert(Base):
     expired_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
 
 
+# --------------------------------------------------------------------------- #
+# Phase D -- shipments: the bridge between the analysis engine (route x class)
+# and the live map (mmsi). One row per cargo booking the desk is tracking.
+# --------------------------------------------------------------------------- #
+class Shipment(Base):
+    """A cargo booking under watch: cargo + lane + (optionally) the physical
+    vessel carrying it. Lets one screen show the planned delivered cost, the
+    live vessel position, a routed ETA and the delivered-cost drift as the
+    voyage runs."""
+
+    __tablename__ = "shipments"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    ref: Mapped[str] = mapped_column(String(16), unique=True, index=True)  # "SHP-XXXX"
+    commodity: Mapped[str] = mapped_column(String(40), default="Thermal Coal")
+    cargo_t: Mapped[float] = mapped_column(Float)
+    origin_code: Mapped[str] = mapped_column(String(24), index=True)
+    dest_code: Mapped[str] = mapped_column(String(24), index=True)
+    vessel_class: Mapped[str | None] = mapped_column(String(16))     # pinned bulk class
+    assigned_mmsi: Mapped[int | None] = mapped_column(Integer, index=True)
+    laycan_start: Mapped[date | None] = mapped_column(Date)
+    laycan_end: Mapped[date | None] = mapped_column(Date)
+    contract_months: Mapped[int] = mapped_column(Integer, default=6)
+    status: Mapped[str] = mapped_column(String(16), default="planned", index=True)
+    # planned | in_transit | arrived | cancelled
+    baseline_usd_per_t: Mapped[float | None] = mapped_column(Float)   # delivered cost at creation
+    baseline_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    notes: Mapped[str | None] = mapped_column(Text)
+    created_at: Mapped[datetime] = _now()
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), onupdate=func.now()
+    )
+
+
+class ShipmentCost(Base):
+    """One valuation of a shipment's delivered cost, appended by the */15 worker
+    step -- the 'cost in real time' series: delivered USD/t and its drift vs the
+    baseline captured when the shipment was created."""
+
+    __tablename__ = "shipment_costs"
+
+    id: Mapped[int] = mapped_column(BigIntPk, primary_key=True, autoincrement=True)
+    shipment_id: Mapped[int] = mapped_column(Integer, ForeignKey("shipments.id"), index=True)
+    ts: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), index=True
+    )
+    delivered_usd_per_t: Mapped[float] = mapped_column(Float)
+    freight_usd_per_t: Mapped[float | None] = mapped_column(Float)
+    bunker_usd_t: Mapped[float | None] = mapped_column(Float)
+    drift_usd_per_t: Mapped[float | None] = mapped_column(Float)        # vs baseline
+    progress_pct: Mapped[float | None] = mapped_column(Float)           # 0..100 from live fix
+    eta_ts: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    distance_remaining_nm: Mapped[float | None] = mapped_column(Float)
+    detail: Mapped[dict | None] = mapped_column(JSON)
+    run_id: Mapped[int | None] = mapped_column(Integer)
+
+    __table_args__ = (Index("ix_shipment_costs_ship_ts", "shipment_id", "ts"),)
+
+
 ALL_TABLES = [
     Port.__table__, LaneGeometry.__table__, IngestRun.__table__,
     Vessel.__table__, Position.__table__, Voyage.__table__,
     FeedSnapshot.__table__, FreightRate.__table__, RateForecast.__table__, Alert.__table__,
+    Shipment.__table__, ShipmentCost.__table__,
 ]

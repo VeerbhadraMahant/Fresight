@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from datetime import date
+
 from pydantic import BaseModel, Field
 
 
@@ -47,3 +49,29 @@ class PlanRequest(BaseModel):
     """A forward procurement plan: several cargo requirements over a horizon."""
     requirements: list[RequirementItem] = Field(..., min_length=1)
     horizon_months: int = Field(6, ge=1, le=18)
+
+
+class ShipmentCreate(BaseModel):
+    """A cargo booking to track. origin/dest accept any registry-resolvable port."""
+    origin_code: str
+    dest_code: str
+    commodity: str = "Thermal Coal"
+    cargo_t: float = Field(..., gt=0)
+    vessel_class: str | None = Field(None, description="pin a bulk class; else the optimiser's pick")
+    assigned_mmsi: int | None = Field(None, description="MMSI of the vessel carrying the cargo")
+    laycan_start: date | None = None
+    laycan_end: date | None = None
+    contract_months: int = Field(6, ge=1, le=18)
+    status: str = Field("planned", pattern="^(planned|in_transit|arrived|cancelled)$")
+    notes: str | None = None
+
+
+class ShipmentPatch(BaseModel):
+    status: str | None = Field(None, pattern="^(planned|in_transit|arrived|cancelled)$")
+    assigned_mmsi: int | None = None
+    vessel_class: str | None = None
+    contract_months: int | None = Field(None, ge=1, le=18)
+    laycan_start: date | None = None
+    laycan_end: date | None = None
+    notes: str | None = None
+    rebaseline: bool | None = Field(None, description="recapture the baseline delivered cost now")

@@ -26,6 +26,9 @@ const BacktestView = lazy(() =>
   import("./components/BacktestView").then((m) => ({ default: m.BacktestView })),
 );
 const MapView = lazy(() => import("./components/MapView").then((m) => ({ default: m.MapView })));
+const ShipmentsView = lazy(() =>
+  import("./components/ShipmentsView").then((m) => ({ default: m.ShipmentsView })),
+);
 
 function ViewFallback() {
   return <div className="shell py-20 text-center text-slate">loading…</div>;
@@ -221,6 +224,23 @@ export default function App() {
                     />
                   </div>
                 )}
+              </div>
+            </>
+          )}
+
+          {view === "shipments" && (
+            <>
+              <h1 className="h-section mt-3 max-w-3xl">Shipment tracking</h1>
+              <p className="lede mt-4 max-w-2xl">
+                Each cargo booking, tied to the vessel carrying it — live position, routed ETA and a
+                delivered&nbsp;cost/t that is re-valued against fresh bunker, congestion and weather
+                every ingest run. The drift vs the baseline captured at booking is the number to
+                watch.
+              </p>
+              <div className="mt-10">
+                <Suspense fallback={<ViewFallback />}>
+                  <ShipmentsView vessels={vessels} />
+                </Suspense>
               </div>
             </>
           )}
