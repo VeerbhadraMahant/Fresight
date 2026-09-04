@@ -1,0 +1,42 @@
+# FreightSight live-AIS relay — a Cloudflare Worker fronting one Durable Object.
+#
+# The Durable Object holds every viewer's WebSocket and, only while at least one
+# viewer is connected, one upstream WebSocket to AISStream.io. Last viewer out
+# closes the upstream socket → zero compute when nobody is watching.
+#
+# Deploy:
+#   cd edge
+#   npm install
+#   npx wrangler secret put AISSTREAM_API_KEY      # free key from aisstream.io
+#   npx wrangler deploy
+#
+# The deploy prints a https://freightsight-edge.<subdomain>.workers.dev URL.
+# Put "<that-url>/ws" into the frontend as VITE_LIVE_WS_URL and rebuild.
+
+name = "freightsight-edge"
+main = "src/index.ts"
+compatibility_date = "2024-12-05"
+compatibility_flags = ["nodejs_compat"]
+workers_dev = true
+
+[vars]
+# Comma-separated "minLat,minLon,maxLat,maxLon" boxes AISStream should stream.
+# Default: a broad Indian-Ocean + SE-Asia + Australia box (tune to your fleet).
+AIS_BBOX = "-45,20,30,150"
+# Drop a vessel from the live set after this many minutes with no fresh frame.
+STALE_MINUTES = "60"
+# Optional: comma-separated allowed Origins for the browser WS (default: any).
+ALLOW_ORIGINS = "*"
+
+[[durable_objects.bindings]]
+name = "FLEET_RELAY"
+class_name = "FleetRelay"
+
+[[migrations]]
+tag = "v1"
+new_classes = ["FleetRelay"]
+
+[observability]
+enabled = true
+
+# AISSTREAM_API_KEY is a secret — set it with `wrangler secret put`, never here.

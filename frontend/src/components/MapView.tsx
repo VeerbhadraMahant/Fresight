@@ -11,6 +11,7 @@ import {
   useMapEvents,
 } from "react-leaflet";
 import { api } from "../api";
+import { useLiveFleet } from "../lib/liveFleet";
 import type { MapPort, MapSummary, MapVessel, MapVesselDetail } from "../types";
 
 const START_CENTER: [number, number] = [18, 60];
@@ -91,6 +92,7 @@ export function MapView() {
   const [err, setErr] = useState<string | null>(null);
   const bboxRef = useRef<string | null>(null);
   const moveTimer = useRef<number | undefined>(undefined);
+  const live = useLiveFleet();
 
   // ports never change -> fetch the whole set once, filter client-side
   useEffect(() => {
@@ -118,10 +120,12 @@ export function MapView() {
       setBounds(b);
       const s = bboxString(b);
       bboxRef.current = s;
+      // push the viewport to the live relay so it only streams what's on screen
+      live.setView([b.getSouth(), wrapLng(b.getWest()), b.getNorth(), wrapLng(b.getEast())]);
       window.clearTimeout(moveTimer.current);
       moveTimer.current = window.setTimeout(() => fetchVessels(s), MOVE_DEBOUNCE_MS);
     },
-    [fetchVessels],
+    [fetchVessels, live],
   );
 
   // re-poll vessels on the current viewport, but only while the tab is visible
@@ -156,7 +160,15 @@ export function MapView() {
     [detail],
   );
 
-  const selectedVessel = vessels.find((v) => v.mmsi === selected) ?? null;
+  // live relay wins per-MMSI (it's seconds-fresh); REST fills the rest
+  const renderVessels = useMemo<MapVessel[]>(() => {
+    if (!live.enabled || live.vessels.size === 0) return vessels;
+    const m = new Map<number, MapVessel>(vessels.map((v) => [v.mmsi, v]));
+    for (const [mmsi, lv] of live.vessels) m.set(mmsi, lv);
+    return [...m.values()];
+  }, [vessels, live.enabled, live.vessels]);
+
+  const selectedVessel = renderVessels.find((v) => v.mmsi === selected) ?? null;
 
   // straight-line hint to the resolved AIS destination port, when we have one
   const courseHint = useMemo<[number, number][] | null>(() => {
@@ -233,7 +245,7 @@ export function MapView() {
         )}
 
         {/* fleet: canvas circles — cheap for ~1k points */}
-        {vessels.map((v) => (
+        {renderVessels.map((v) => (
           <CircleMarker
             key={v.mmsi}
             center={[v.lat, v.lon]}
@@ -270,23 +282,43 @@ export function MapView() {
           className="pointer-events-auto rounded-md border border-mist bg-white px-3 py-2 font-sans text-[12px] text-graphite"
           style={{ boxShadow: "0 2px 12px rgba(0,0,0,0.16)" }}
         >
-          <div className="font-display text-[13px]">Live vessel map</div>
+          <div className="flex items-center gap-2">
+            <span className="font-display text-[13px]">Live vessel map</span>
+            {live.enabled && (
+              <span
+                className="rounded-pill px-1.5 py-0.5 font-sans text-[10px]"
+                style={{
+                  background: live.connected ? "#e6efe6" : "#f5f5f5",
+                  color: live.connected ? "#2f6b31" : "#828282",
+                }}
+                title={
+                  live.beat
+                    ? `relay upstream ${live.beat.upstream} · ${live.beat.vessels} vessels`
+                    : "connecting to live relay…"
+                }
+              >
+                {live.connected ? "● streaming" : "○ relay offline"}
+              </span>
+            )}
+          </div>
           <div className="mt-1 text-slate">
-            {vesselsEnabled === false ? (
+            {vesselsEnabled === false && !live.connected ? (
               <span className="text-ember">
                 Vessel feed off — the API is running without a database
                 (<code>DATABASE_URL</code>). Ports &amp; sea lanes only.
               </span>
-            ) : vesselsEnabled === true && vessels.length === 0 ? (
+            ) : renderVessels.length === 0 && !live.connected ? (
               <span className="text-ember">
                 DB connected but 0 vessels here — pan out, or run{" "}
                 <code>python -m worker.ingest</code> to sample AIS.
               </span>
             ) : (
-              `${vessels.length} vessels in view` +
-              (summary?.last_sample_at
-                ? ` · sampled ${new Date(summary.last_sample_at).toUTCString().slice(17, 22)} UTC`
-                : "")
+              `${renderVessels.length} vessels in view` +
+              (live.connected
+                ? " · live"
+                : summary?.last_sample_at
+                  ? ` · sampled ${new Date(summary.last_sample_at).toUTCString().slice(17, 22)} UTC`
+                  : "")
             )}
           </div>
           <div className="mt-1.5 flex flex-wrap items-center gap-x-3 gap-y-1 text-slate">
